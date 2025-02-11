@@ -2,6 +2,8 @@ import os
 os.environ['USE_MOCK_OLLAMA'] = 'true'  # Enable mock mode by default
 
 from flask import Flask, request, jsonify, send_from_directory, render_template
+import hypercorn
+from hypercorn.config import Config
 from ollama_wrapper import OllamaClient, AsyncOllamaClient
 from ollama_wrapper.models import (
     GenerateRequest, ChatRequest, CreateModelRequest,
@@ -19,7 +21,9 @@ import hashlib
 import asyncio
 from typing import Any, Dict, Generator, AsyncGenerator
 from functools import partial
+from ollama import AsyncClient
 
+ollama_client = AsyncClient()
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,6 +34,17 @@ app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB max-limit for file 
 client = OllamaClient()
 async_client = AsyncOllamaClient()
 
+def handle_ollama_error(error: Exception) -> tuple[dict, int]:
+    if isinstance(error, ConnectionError):
+        logger.error("Ollama connection error: Failed to connect to service")
+        return {"error": "Failed to connect to Ollama. Please ensure Ollama is running."}, 503
+    elif "Event loop is closed" in str(error):
+        logger.error("Event loop error: Creating new event loop")
+        import asyncio
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        return {"error": "Please retry your request"}, 503
+    logger.error(f"Ollama error: {str(error)}")
+    return {"error": str(error)}, 500
 def handle_streaming_response(response: Generator) -> Flask.response_class:
     """Handle streaming responses from Ollama API"""
     def generate_stream():
@@ -301,16 +316,55 @@ def chat():
         return handle_ollama_error(e)
 
 @app.route('/api/models', methods=['GET'])
-def list_models():
+async def list_models():
     """List available models endpoint"""
     try:
-        response = client.list_models()
-        if isinstance(response, dict) and 'models' in response:
-            return jsonify(response['models'])
-        return jsonify([])
+        response = await ollama_client.list()
+        models_info = []
+        for model in response.models:
+            model_info = {
+                'name': model.model,
+                'size': f"{(model.size / 1024 / 1024):.2f} MB",
+            }
+            if model.details:
+                model_info.update({
+                    'format': model.details.format,
+                    'family': model.details.family,
+                    'parameter_size': model.details.parameter_size,
+                    'quantization_level': model.details.quantization_level
+                })
+            models_info.append(model_info)
+        return jsonify(models_info)
     except Exception as e:
-        logger.error(f"List models endpoint error: {str(e)}")
         return handle_ollama_error(e)
+    #     if isinstance(response, dict) and 'models' in response:
+    #         return jsonify(response['models'])
+    #     return jsonify([])
+    # except Exception as e:
+    #     logger.error(f"List models endpoint error: {str(e)}")
+    #     return handle_ollama_error(e)
+    
+# @app.route('/models', methods=['GET'])
+# async def list_models():
+#     try:
+#         response = await ollama_client.list()
+#         models_info = []
+#         for model in response.models:
+#             model_info = {
+#                 'name': model.model,
+#                 'size': f"{(model.size / 1024 / 1024):.2f} MB",
+#             }
+#             if model.details:
+#                 model_info.update({
+#                     'format': model.details.format,
+#                     'family': model.details.family,
+#                     'parameter_size': model.details.parameter_size,
+#                     'quantization_level': model.details.quantization_level
+#                 })
+#             models_info.append(model_info)
+#         return jsonify(models_info)
+#     except Exception as e:
+#         return await handle_ollama_error(e)
 
 @app.route('/api/running', methods=['GET'])
 def list_running_models():
@@ -363,5 +417,15 @@ def index():
     """Render the main UI"""
     return render_template('index.html')
 
+# @app.errorhandler(404)
+# def not_found_error(error):
+#     return render_template('index.html'), 404
+
+# @app.errorhandler(500)
+# def internal_error(error):
+#     return render_template('index.html'), 500
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    config = Config()
+    config.bind = ["0.0.0.0:5000"]
+    hypercorn.run(app, config)

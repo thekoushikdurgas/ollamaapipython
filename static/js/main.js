@@ -32,16 +32,18 @@ async function checkServerStatus() {
 
 // Check server status on page load and every 30 seconds
 async function populateModelDropdowns() {
+  
+  showSpinner(); // Show spinner before request
   try {
     const response = await fetch("/api/models");
     if (!response.ok) {
-      console.error("Failed to fetch models:", response.statusText);
-      return;
+      const error = await response.json();
+      throw new Error(error.error || "Failed to list models");
     }
+    const result = await response.json();
+    const models = result || [];
+    // console.log(result);
     
-    const data = await response.json();
-    const models = data.models || [];
-
     // Get all model select elements
     const modelSelects = document.querySelectorAll('select[name="model"]');
 
@@ -62,26 +64,104 @@ async function populateModelDropdowns() {
         // Calculate size in GB
         const sizeGB = (model.size / 1024 / 1024 / 1024).toFixed(2);
         
-        // Format option text with model details
-        option.textContent = `${model.name} (${model.details.parameter_size}, ${model.details.quantization_level}, ${sizeGB}GB)`;
+        // Build model text with all available details
+        let modelText = model.name;
+        if (model.details) {
+          if (model.details.parameter_size) modelText += ` (${model.details.parameter_size})`;
+          if (model.details.quantization_level) modelText += ` - ${model.details.quantization_level}`;
+          if (sizeGB) modelText += ` - ${sizeGB}GB`;
+        }
+        option.textContent = modelText;
         
         // Add data attributes for additional info
-        option.dataset.family = model.details.family;
-        option.dataset.format = model.details.format;
-        option.dataset.modified = new Date(model.modified_at).toLocaleString();
+        if (model.details) {
+          option.dataset.family = model.details.family || '';
+          option.dataset.format = model.details.format || '';
+          if (model.modified_at) {
+            option.dataset.modified = new Date(model.modified_at).toLocaleString();
+          }
+        }
         
         select.appendChild(option);
       });
     });
+    showResponse("modelsResponse", result);
   } catch (error) {
+    showError("modelsResponse", error.message);
     console.error("Failed to load models:", error);
+    // Add error option to all selects
+    const modelSelects = document.querySelectorAll('select[name="model"]');
+    modelSelects.forEach((select) => {
+      select.innerHTML = '<option value="">Failed to load models</option>';
+    });
   }
+  // try {
+  //   // const response = await fetch("/api/models");
+  //   // if (!response.ok) {
+  //   //   throw new Error(response.statusText);
+  //   // }
+    
+  //   const data = await response.json();
+  //   const models = data || [];
+    
+  //   // Get all model select elements
+  //   const modelSelects = document.querySelectorAll('select[name="model"]');
+
+  //   modelSelects.forEach((select) => {
+  //     // Clear existing options except the first one
+  //     while (select.options.length > 1) {
+  //       select.remove(1);
+  //     }
+
+  //     // Sort models by name
+  //     models.sort((a, b) => a.name.localeCompare(b.name));
+
+  //     // Add model options
+  //     models.forEach((model) => {
+  //       const option = document.createElement("option");
+  //       option.value = model.name;
+        
+  //       // Calculate size in GB
+  //       const sizeGB = (model.size / 1024 / 1024 / 1024).toFixed(2);
+        
+  //       // Build model text with all available details
+  //       let modelText = model.name;
+  //       if (model.details) {
+  //         if (model.details.parameter_size) modelText += ` (${model.details.parameter_size})`;
+  //         if (model.details.quantization_level) modelText += ` - ${model.details.quantization_level}`;
+  //         if (sizeGB) modelText += ` - ${sizeGB}GB`;
+  //       }
+  //       option.textContent = modelText;
+        
+  //       // Add data attributes for additional info
+  //       if (model.details) {
+  //         option.dataset.family = model.details.family || '';
+  //         option.dataset.format = model.details.format || '';
+  //         if (model.modified_at) {
+  //           option.dataset.modified = new Date(model.modified_at).toLocaleString();
+  //         }
+  //       }
+        
+  //       select.appendChild(option);
+  //     });
+  //   });
+  // } catch (error) {
+  //   console.error("Failed to load models:", error);
+  //   // Add error option to all selects
+  //   const modelSelects = document.querySelectorAll('select[name="model"]');
+  //   modelSelects.forEach((select) => {
+  //     select.innerHTML = '<option value="">Failed to load models</option>';
+  //   });
+  // }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   checkServerStatus();
   setInterval(checkServerStatus, 30000);
   populateModelDropdowns();
+  setInterval(populateModelDropdowns, 30000);
+  // listModels();
+  // setInterval(listModels, 30000);
 });
 
 function showError(elementId, error) {
@@ -404,21 +484,21 @@ document.getElementById("chatForm").addEventListener("submit", async (e) => {
 });
 
 // Model listing and information
-async function listModels() {
-  showSpinner(); // Show spinner before request
-  try {
-    const response = await fetch("/api/models");
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to list models");
-    }
-    const result = await response.json();
-    console.log(result);
-    showResponse("modelsResponse", result);
-  } catch (error) {
-    showError("modelsResponse", error.message);
-  }
-}
+// async function listModels() {
+//   showSpinner(); // Show spinner before request
+//   try {
+//     const response = await fetch("/api/models");
+//     if (!response.ok) {
+//       const error = await response.json();
+//       throw new Error(error.error || "Failed to list models");
+//     }
+//     const result = await response.json();
+//     console.log(str(result));
+//     showResponse("modelsResponse", result);
+//   } catch (error) {
+//     showError("modelsResponse", error.message);
+//   }
+// }
 
 async function listRunningModels() {
   showSpinner(); // Show spinner before request

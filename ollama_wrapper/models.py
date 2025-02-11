@@ -46,6 +46,7 @@ class GenerateRequest(BaseModel):
     images: Optional[List[str]] = None
     options: Optional[ModelOptions] = None
     suffix: Optional[str] = None
+    stream: Optional[bool] = True
 
 class ChatRequest(BaseModel):
     model: str
