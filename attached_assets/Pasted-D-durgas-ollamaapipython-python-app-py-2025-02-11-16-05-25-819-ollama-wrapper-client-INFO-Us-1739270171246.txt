@@ -1,0 +1,28 @@
+D:\durgas\ollamaapipython>python app.py
+2025-02-11 16:05:25,819 - ollama_wrapper.client - INFO - Using mock Ollama server for development/testing
+INFO:ollama_wrapper.client:Using mock Ollama server for development/testing
+2025-02-11 16:05:27,876 - ollama_wrapper.mock_server - ERROR - Failed to fetch models: 404
+ERROR:ollama_wrapper.mock_server:Failed to fetch models: 404
+2025-02-11 16:05:27,877 - ollama_wrapper.client - INFO - Initialized Ollama client with base URL: http://localhost:11434
+INFO:ollama_wrapper.client:Initialized Ollama client with base URL: http://localhost:11434
+2025-02-11 16:05:27,878 - ollama_wrapper.async_client - INFO - Using mock Ollama server for development/testing
+INFO:ollama_wrapper.async_client:Using mock Ollama server for development/testing
+2025-02-11 16:05:29,910 - ollama_wrapper.mock_server - ERROR - Failed to fetch models: 404
+ERROR:ollama_wrapper.mock_server:Failed to fetch models: 404
+2025-02-11 16:05:29,911 - ollama_wrapper.async_client - INFO - Initialized Async Ollama client with base URL: http://localhost:11434       
+INFO:ollama_wrapper.async_client:Initialized Async Ollama client with base URL: http://localhost:11434
+ * Serving Flask app 'app'
+ * Debug mode: off
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.2:5000
+INFO:werkzeug:Press CTRL+C to quit
+INFO:werkzeug:127.0.0.1 - - [11/Feb/2025 16:05:40] "GET /api/version HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [11/Feb/2025 16:05:41] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [11/Feb/2025 16:05:41] "GET /static/css/style.css HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [11/Feb/2025 16:05:41] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:127.0.0.1 - - [11/Feb/2025 16:05:42] "GET /api/version HTTP/1.1" 200 -
+2025-02-11 16:05:44,167 - ollama_wrapper.client - ERROR - Failed to fetch models: 404
+ERROR:ollama_wrapper.client:Failed to fetch models: 404
+INFO:werkzeug:127.0.0.1 - - [11/Feb/2025 16:05:44] "GET /api/models HTTP/1.1" 200 -

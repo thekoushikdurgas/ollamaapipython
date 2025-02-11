@@ -1,5 +1,6 @@
 """Mock server for Ollama API testing"""
 import time
+import requests
 from typing import Dict, Any, Generator, Optional
 
 import requests
@@ -99,19 +100,40 @@ class MockOllamaServer:
 
     def list_models(self) -> Dict[str, Any]:
         """Mock list models response"""
-        try:
-            response = requests.get(f"{Config.OLLAMA_API_URL}/api/models")
-            if not response.ok:
-                logger.error(f"Failed to fetch models: {response.status_code}")
-                return {"models": []}
-            
-            data = response.json()
-            models = data.get("models", [])
-            logger.info(f"List models: {len(models)}")
-            return {"models": models}
-        except Exception as e:
-            logger.error(f"List models request failed: {str(e)}")
-            raise
+        return {
+            "models": [
+                {
+                    "name": "my-assistant:latest",
+                    "model": "my-assistant:latest",
+                    "modified_at": "2025-02-11T04:28:34+05:30",
+                    "size": 2019393299,
+                    "digest": "c60ad55315a522bb8967df8a787f336fb80f143d6700c2709c1dcf9d324110c8",
+                    "details": {
+                        "format": "gguf",
+                        "family": "llama",
+                        "families": ["llama"],
+                        "parameter_size": "3.2B",
+                        "quantization_level": "Q4_K_M",
+                        "parent_model": ""
+                    }
+                },
+                {
+                    "name": "codellama:python",
+                    "model": "codellama:python",
+                    "modified_at": "2025-02-11T03:57:02+05:30", 
+                    "size": 3825819368,
+                    "digest": "120ca3419eae9e8d1695d95ee5825aed1902a29d93404f1fc5542c5297ac32f7",
+                    "details": {
+                        "format": "gguf",
+                        "family": "llama",
+                        "families": ["llama"],
+                        "parameter_size": "7B",
+                        "quantization_level": "Q4_0",
+                        "parent_model": ""
+                    }
+                }
+            ]
+        }
 
     def show_model(self, model_name: str) -> Dict[str, Any]:
         """Mock show model response"""

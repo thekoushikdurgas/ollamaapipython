@@ -34,10 +34,13 @@ async function checkServerStatus() {
 async function populateModelDropdowns() {
   try {
     const response = await fetch("/api/models");
-    if (!response.ok) return;
+    if (!response.ok) {
+      throw new Error(response.statusText);
+    }
+    
     const data = await response.json();
     const models = data.models || [];
-
+    
     // Get all model select elements
     const modelSelects = document.querySelectorAll('select[name="model"]');
 
@@ -47,16 +50,45 @@ async function populateModelDropdowns() {
         select.remove(1);
       }
 
+      // Sort models by name
+      models.sort((a, b) => a.name.localeCompare(b.name));
+
       // Add model options
       models.forEach((model) => {
         const option = document.createElement("option");
         option.value = model.name;
-        option.textContent = `${model.name} (${model.details.parameter_size}, ${model.details.quantization_level})`;
+        
+        // Calculate size in GB
+        const sizeGB = (model.size / 1024 / 1024 / 1024).toFixed(2);
+        
+        // Build model text with all available details
+        let modelText = model.name;
+        if (model.details) {
+          if (model.details.parameter_size) modelText += ` (${model.details.parameter_size})`;
+          if (model.details.quantization_level) modelText += ` - ${model.details.quantization_level}`;
+          if (sizeGB) modelText += ` - ${sizeGB}GB`;
+        }
+        option.textContent = modelText;
+        
+        // Add data attributes for additional info
+        if (model.details) {
+          option.dataset.family = model.details.family || '';
+          option.dataset.format = model.details.format || '';
+          if (model.modified_at) {
+            option.dataset.modified = new Date(model.modified_at).toLocaleString();
+          }
+        }
+        
         select.appendChild(option);
       });
     });
   } catch (error) {
     console.error("Failed to load models:", error);
+    // Add error option to all selects
+    const modelSelects = document.querySelectorAll('select[name="model"]');
+    modelSelects.forEach((select) => {
+      select.innerHTML = '<option value="">Failed to load models</option>';
+    });
   }
 }
 
