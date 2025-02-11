@@ -51,7 +51,8 @@ async function populateModelDropdowns() {
       models.forEach((model) => {
         const option = document.createElement("option");
         option.value = model.name;
-        option.textContent = `${model.name} (${model.details.parameter_size}, ${model.details.quantization_level})`;
+        const size = (model.size / 1024 / 1024 / 1024).toFixed(2);
+        option.textContent = `${model.name} (${model.details.parameter_size}, ${model.details.quantization_level}, ${size}GB)`;
         select.appendChild(option);
       });
     });
