@@ -39,8 +39,8 @@ function showError(elementId, error) {
     const element = document.getElementById(elementId);
     element.innerHTML = `<div class="error-message">
         <strong>Error:</strong> ${error}
-        ${error.includes('Failed to connect to Ollama server') ? 
-            '<br><br><em>Tip: Make sure Ollama is installed and running locally. Visit <a href="https://ollama.ai/download" target="_blank">https://ollama.ai/download</a> for installation instructions.</em>' 
+        ${error.includes('Failed to connect to Ollama server') ?
+            '<br><br><em>Tip: Make sure Ollama is installed and running locally. Visit <a href="https://ollama.ai/download" target="_blank">https://ollama.ai/download</a> for installation instructions.</em>'
             : ''}
     </div>`;
 }
@@ -85,19 +85,68 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
     const responseArea = document.getElementById('generateResponse');
 
     try {
+        // Build request data with all supported options
         const data = {
             model: form.model.value,
             prompt: form.prompt.value,
-            options: {
-                temperature: parseFloat(form.temperature.value) || undefined,
-                stream: form.stream.value === 'true'
-            }
+            stream: form.stream.value === 'true',
+            raw: form.raw.value === 'true'
         };
 
+        // Add optional fields if provided
         if (form.system.value) {
             data.system = form.system.value;
         }
+        if (form.template.value) {
+            data.template = form.template.value;
+        }
+        if (form.format.value) {
+            if (form.format.value === 'schema') {
+                // Example schema for structured output
+                data.format = {
+                    type: "object",
+                    properties: {
+                        response: {
+                            type: "string",
+                            description: "The generated response"
+                        }
+                    }
+                };
+            } else {
+                data.format = form.format.value; // 'json'
+            }
+        }
 
+        // Handle model options
+        const options = {};
+        const numericFields = ['temperature', 'top_p', 'top_k', 'seed', 'num_predict'];
+        numericFields.forEach(field => {
+            const value = form[field].value;
+            if (value !== '') {
+                options[field] = parseFloat(value);
+            }
+        });
+
+        if (form.keep_alive.value) {
+            options.keep_alive = form.keep_alive.value;
+        }
+
+        if (Object.keys(options).length > 0) {
+            data.options = options;
+        }
+
+        // Handle images for multimodal models
+        const imageFiles = form.images.files;
+        if (imageFiles.length > 0) {
+            const images = [];
+            for (const file of imageFiles) {
+                const base64 = await readFileAsBase64(file);
+                images.push(base64);
+            }
+            data.images = images;
+        }
+
+        // Make the API request
         const response = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -109,8 +158,18 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
             throw new Error(error.error || 'Failed to generate completion');
         }
 
-        if (data.options.stream) {
-            await handleStreamingResponse(response, responseArea, data => data.response);
+        if (data.stream) {
+            await handleStreamingResponse(response, responseArea, data => {
+                // For structured outputs (JSON/schema), format the response
+                if (data.format === 'json' || data.format?.type === 'object') {
+                    try {
+                        return JSON.stringify(JSON.parse(data.response), null, 2) + '\n';
+                    } catch {
+                        return data.response;
+                    }
+                }
+                return data.response;
+            });
         } else {
             const result = await response.json();
             showResponse('generateResponse', result);
@@ -119,6 +178,20 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
         showError('generateResponse', error.message);
     }
 });
+
+// Utility function to read file as base64
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            // Extract the base64 data from the data URL
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
 
 // Chat
 function addMessage() {
@@ -256,8 +329,8 @@ document.getElementById('createModelForm').addEventListener('submit', async (e) 
             throw new Error(error.error || 'Failed to create model');
         }
 
-        await handleStreamingResponse(response, 
-            document.getElementById('createModelResponse'), 
+        await handleStreamingResponse(response,
+            document.getElementById('createModelResponse'),
             data => data.status ? `${data.status}\n` : ''
         );
     } catch (error) {
@@ -335,8 +408,8 @@ document.getElementById('modelOperationsForm').addEventListener('submit', async 
         }
 
         if (stream && (action === 'pull' || action === 'push')) {
-            await handleStreamingResponse(response, 
-                document.getElementById('modelOperationsResponse'), 
+            await handleStreamingResponse(response,
+                document.getElementById('modelOperationsResponse'),
                 data => data.status ? `${data.status}\n` : ''
             );
         } else {

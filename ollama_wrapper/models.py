@@ -15,6 +15,25 @@ class ModelOptions(BaseModel):
     num_predict: Optional[int] = None
     stream: Optional[bool] = True
     keep_alive: Optional[str] = "5m"
+    num_ctx: Optional[int] = None
+    num_gpu: Optional[int] = None
+    num_thread: Optional[int] = None
+    repeat_last_n: Optional[int] = None
+    repeat_penalty: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    mirostat: Optional[int] = None
+    mirostat_tau: Optional[float] = None
+    mirostat_eta: Optional[float] = None
+    penalize_newline: Optional[bool] = None
+    stop: Optional[List[str]] = None
+    numa: Optional[bool] = None
+    num_batch: Optional[int] = None
+    main_gpu: Optional[int] = None
+    low_vram: Optional[bool] = None
+    vocab_only: Optional[bool] = None
+    use_mmap: Optional[bool] = None
+    use_mlock: Optional[bool] = None
 
 class GenerateRequest(BaseModel):
     model: str
@@ -26,6 +45,7 @@ class GenerateRequest(BaseModel):
     raw: Optional[bool] = False
     images: Optional[List[str]] = None
     options: Optional[ModelOptions] = None
+    suffix: Optional[str] = None
 
 class ChatRequest(BaseModel):
     model: str

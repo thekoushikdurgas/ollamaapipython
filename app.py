@@ -78,6 +78,16 @@ def generate():
         if 'model' in data:
             data['model'] = validate_model_name(data['model'])
 
+        # Handle format options
+        if isinstance(data.get('format'), dict):
+            # Validate JSON schema format
+            if 'type' not in data['format']:
+                raise OllamaValidationError("Invalid JSON schema format: missing 'type' field")
+        elif data.get('format') == 'json':
+            # Ensure prompt indicates JSON response is expected
+            if 'prompt' in data and 'json' not in data['prompt'].lower():
+                data['prompt'] += " Respond using JSON"
+
         # Create generate request
         request_data = GenerateRequest(**data)
         response = client.generate(request_data)
