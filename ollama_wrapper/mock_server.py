@@ -1,10 +1,10 @@
 """Mock server for Ollama API testing"""
 import time
-from typing import Dict, Any, Generator
+from typing import Dict, Any, Generator, Optional
 
 class MockOllamaServer:
     """Mock implementation of Ollama server for testing"""
-    
+
     def __init__(self):
         self.models = {
             "llama2": {
@@ -21,16 +21,19 @@ class MockOllamaServer:
                 }
             }
         }
-    
-    def generate_response(self, model: str, prompt: str, stream: bool = True) -> Generator:
+
+    def generate_response(self, model: str, prompt: str, stream: bool = True) -> Generator[Dict[str, Any], None, None]:
         """Mock generate completion response"""
+        if not model or not prompt:
+            raise ValueError("Model and prompt are required")
+
         response = {
             "model": model,
             "created_at": "2024-02-11T10:00:00Z",
             "response": f"This is a mock response for: {prompt}",
             "done": True
         }
-        
+
         if stream:
             # Simulate streaming response
             words = response["response"].split()
@@ -41,8 +44,11 @@ class MockOllamaServer:
         else:
             yield response
 
-    def chat_response(self, model: str, messages: list, stream: bool = True) -> Generator:
+    def chat_response(self, model: str, messages: list, stream: bool = True) -> Generator[Dict[str, Any], None, None]:
         """Mock chat completion response"""
+        if not model or not messages:
+            raise ValueError("Model and messages are required")
+
         response = {
             "model": model,
             "created_at": "2024-02-11T10:00:00Z",
@@ -52,7 +58,7 @@ class MockOllamaServer:
             },
             "done": True
         }
-        
+
         if stream:
             words = response["message"]["content"].split()
             for word in words:
@@ -62,10 +68,13 @@ class MockOllamaServer:
         else:
             yield response
 
-    def create_model(self, model: str, **kwargs) -> Generator:
+    def create_model(self, model_name: str, **kwargs) -> Generator[Dict[str, Any], None, None]:
         """Mock model creation response"""
-        self.models[model] = {
-            "name": model,
+        if not model_name:
+            raise ValueError("Model name is required")
+
+        self.models[model_name] = {
+            "name": model_name,
             "modified_at": "2024-02-11T10:00:00Z",
             "size": 4000000000,
             "digest": "sha256:mock123",
@@ -76,17 +85,19 @@ class MockOllamaServer:
                 "quantization_level": kwargs.get("quantize", "Q4_0")
             }
         }
-        yield {"status": f"Successfully created model {model}"}
+        yield {"status": f"Successfully created model {model_name}"}
 
     def list_models(self) -> Dict[str, Any]:
         """Mock list models response"""
         return {"models": list(self.models.values())}
 
-    def show_model(self, model: str, verbose: bool = False) -> Dict[str, Any]:
+    def show_model(self, model_name: str) -> Dict[str, Any]:
         """Mock show model response"""
-        if model not in self.models:
-            raise ValueError(f"Model {model} not found")
-        return self.models[model]
+        if not model_name:
+            raise ValueError("Model name is required")
+        if model_name not in self.models:
+            raise ValueError(f"Model {model_name} not found")
+        return self.models[model_name]
 
     def delete_model(self, model: str) -> Dict[str, Any]:
         """Mock delete model response"""
@@ -117,6 +128,8 @@ class MockOllamaServer:
 
     def create_embedding(self, model: str, prompt: str) -> Dict[str, Any]:
         """Mock embedding response"""
+        if not model or not prompt:
+            raise ValueError("Model and prompt are required")
         return {"embedding": [0.1, 0.2, 0.3, 0.4, 0.5]}  # Mock 5D embedding
 
     def get_version(self) -> Dict[str, Any]:

@@ -2,7 +2,7 @@ import os
 os.environ['USE_MOCK_OLLAMA'] = 'true'  # Enable mock mode by default
 
 from flask import Flask, request, jsonify, send_from_directory, render_template
-from ollama_wrapper import OllamaClient
+from ollama_wrapper import OllamaClient, AsyncOllamaClient
 from ollama_wrapper.models import (
     GenerateRequest, ChatRequest, CreateModelRequest,
     EmbeddingRequest, ModelOptions, Message,
@@ -16,7 +16,9 @@ from ollama_wrapper.exceptions import (
 from ollama_wrapper.utils import validate_model_name
 import logging
 import hashlib
-from typing import Any, Dict, Generator
+import asyncio
+from typing import Any, Dict, Generator, AsyncGenerator
+from functools import partial
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,7 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True # Enable template reloading
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB max-limit for file uploads
 client = OllamaClient()
+async_client = AsyncOllamaClient()
 
 def handle_streaming_response(response: Generator) -> Flask.response_class:
     """Handle streaming responses from Ollama API"""
@@ -37,6 +40,44 @@ def handle_streaming_response(response: Generator) -> Flask.response_class:
             logger.error(f"Streaming error: {str(e)}")
             yield jsonify({"error": str(e), "type": "StreamingError"}).get_data(as_text=True)
     return app.response_class(generate_stream(), mimetype='application/x-ndjson')
+
+async def handle_async_streaming_response(response: AsyncGenerator) -> Flask.response_class:
+    """Handle async streaming responses from Ollama API"""
+    async def generate_stream():
+        try:
+            async for chunk in response:
+                yield jsonify(chunk).get_data(as_text=True) + '\n'
+        except Exception as e:
+            logger.error(f"Async streaming error: {str(e)}")
+            yield jsonify({"error": str(e), "type": "StreamingError"}).get_data(as_text=True)
+    return app.response_class(generate_stream(), mimetype='application/x-ndjson')
+
+@app.route('/api/async/generate', methods=['POST'])
+async def async_generate():
+    """Async generate completion endpoint"""
+    try:
+        data = request.get_json()
+        if not data:
+            raise OllamaValidationError("No JSON data provided")
+
+        # Validate model name format
+        if 'model' in data:
+            data['model'] = validate_model_name(data['model'])
+
+        # Create generate request
+        request_data = GenerateRequest(**data)
+
+        async with async_client as client:
+            response = await client.generate(request_data)
+
+            # Handle streaming and non-streaming responses
+            if request_data.stream:
+                return await handle_async_streaming_response(response)
+            return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Async generate endpoint error: {str(e)}")
+        return handle_ollama_error(e)
 
 @app.errorhandler(OllamaError)
 def handle_ollama_error(error):
