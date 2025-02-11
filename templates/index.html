@@ -57,13 +57,28 @@
                                 <textarea class="form-control" name="system" rows="2"></textarea>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Options</label>
+                                <label class="form-label">Template (Optional)</label>
+                                <textarea class="form-control" name="template" rows="2"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Advanced Options</label>
                                 <div class="row">
-                                    <div class="col-md-3">
-                                        <label class="form-label">Temperature</label>
-                                        <input type="number" class="form-control" name="temperature" step="0.1" min="0" max="2">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Format</label>
+                                        <select class="form-control" name="format">
+                                            <option value="">None</option>
+                                            <option value="json">JSON</option>
+                                            <option value="schema">JSON Schema</option>
+                                        </select>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Raw Mode</label>
+                                        <select class="form-control" name="raw">
+                                            <option value="false">No</option>
+                                            <option value="true">Yes</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
                                         <label class="form-label">Stream</label>
                                         <select class="form-control" name="stream">
                                             <option value="true">Yes</option>
@@ -71,6 +86,42 @@
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Model Options</label>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Temperature</label>
+                                        <input type="number" class="form-control" name="temperature" step="0.1" min="0" max="2">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Top P</label>
+                                        <input type="number" class="form-control" name="top_p" step="0.1" min="0" max="1">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Top K</label>
+                                        <input type="number" class="form-control" name="top_k" step="1" min="1">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Seed</label>
+                                        <input type="number" class="form-control" name="seed" step="1" min="0">
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Keep Alive (e.g., "5m", "1h")</label>
+                                        <input type="text" class="form-control" name="keep_alive" placeholder="5m">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Number of Tokens</label>
+                                        <input type="number" class="form-control" name="num_predict" step="1" min="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Images (Optional, for multimodal models)</label>
+                                <input type="file" class="form-control" name="images" multiple accept="image/*">
+                                <small class="text-muted">Select one or more images to include with your prompt</small>
                             </div>
                             <button type="submit" class="btn btn-primary">Generate</button>
                         </form>
