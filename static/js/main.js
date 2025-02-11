@@ -31,9 +31,42 @@ async function checkServerStatus() {
 }
 
 // Check server status on page load and every 30 seconds
+async function populateModelDropdowns() {
+    try {
+        const response = await fetch('/api/models');
+        if (!response.ok) return;
+        const data = await response.json();
+        const models = data.models || [];
+        
+        // Get all model input fields
+        const modelInputs = document.querySelectorAll('input[name="model"]');
+        
+        // Replace each input with a select
+        modelInputs.forEach(input => {
+            const select = document.createElement('select');
+            select.className = input.className;
+            select.name = input.name;
+            select.required = input.required;
+            
+            // Add empty option
+            select.innerHTML = '<option value="">Select a model</option>';
+            
+            // Add model options
+            models.forEach(model => {
+                select.innerHTML += `<option value="${model.name}">${model.name}</option>`;
+            });
+            
+            input.parentNode.replaceChild(select, input);
+        });
+    } catch (error) {
+        console.error('Failed to load models:', error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     checkServerStatus();
     setInterval(checkServerStatus, 30000);
+    populateModelDropdowns();
 });
 
 function showError(elementId, error) {
