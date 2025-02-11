@@ -116,7 +116,7 @@ class OllamaClient:
         response = None
 
         try:
-            self.rate_limiter.wait(endpoint) #Added rate limiting
+            self.rate_limiter.wait(endpoint)  
             logger.debug(f"Making {method} request to {url}")
             if data:
                 logger.debug(f"Request data: {json.dumps(data, indent=2)}")

@@ -1,6 +1,16 @@
+// Utility functions for spinner
+function showSpinner() {
+    document.querySelector('.spinner-container').classList.add('visible');
+}
+
+function hideSpinner() {
+    document.querySelector('.spinner-container').classList.remove('visible');
+}
+
 // Server status check
 async function checkServerStatus() {
     const statusDiv = document.getElementById('serverStatus');
+    showSpinner();// Show spinner before request
     try {
         const response = await fetch('/api/version');
         if (response.ok) {
@@ -14,17 +24,9 @@ async function checkServerStatus() {
             throw new Error('Failed to connect to Ollama server');
         }
     } catch (error) {
-        statusDiv.className = 'alert alert-danger mb-4';
-        statusDiv.innerHTML = `
-            <h4 class="alert-heading">❌ Connection Error</h4>
-            <p>Failed to connect to Ollama server. Please make sure:</p>
-            <ul>
-                <li>Ollama is installed on your system</li>
-                <li>The Ollama server is running on port 11434</li>
-                <li>No firewall is blocking the connection</li>
-            </ul>
-            <p><a href="https://ollama.ai/download" target="_blank">Click here for Ollama installation instructions</a></p>
-        `;
+        showError('serverStatus', error);
+    } finally {
+        hideSpinner();// Hide spinner after response
     }
 }
 
@@ -34,8 +36,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(checkServerStatus, 30000);
 });
 
-// Utility functions
 function showError(elementId, error) {
+    hideSpinner();  // Hide spinner on error
     const element = document.getElementById(elementId);
     element.innerHTML = `<div class="error-message">
         <strong>Error:</strong> ${error}
@@ -46,6 +48,7 @@ function showError(elementId, error) {
 }
 
 function showResponse(elementId, response) {
+    hideSpinner();  // Hide spinner after response
     const element = document.getElementById(elementId);
     element.innerHTML = `<div class="success-message">
         ${JSON.stringify(response, null, 2)}
@@ -92,6 +95,7 @@ function addModelFile() {
 // Generate completion
 document.getElementById('generateForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    showSpinner();  // Show spinner before request
     const form = e.target;
     const responseArea = document.getElementById('generateResponse');
 
@@ -170,6 +174,7 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
         }
 
         if (data.stream) {
+            hideSpinner();  // Hide spinner before streaming starts
             await handleStreamingResponse(response, responseArea, data => {
                 // For structured outputs (JSON/schema), format the response
                 if (data.format === 'json' || data.format?.type === 'object') {
@@ -227,6 +232,7 @@ function addMessage() {
 
 document.getElementById('chatForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    showSpinner();  // Show spinner before request
     const form = e.target;
     const responseArea = document.getElementById('chatResponse');
 
@@ -309,6 +315,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         }
 
         if (data.stream) {
+            hideSpinner();  // Hide spinner before streaming starts
             await handleStreamingResponse(response, responseArea, data => {
                 // For structured outputs (JSON/schema), format the response
                 if (data.message?.content) {
@@ -334,6 +341,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
 // Model listing and information
 async function listModels() {
+    showSpinner();  // Show spinner before request
     try {
         const response = await fetch('/api/models');
         if (!response.ok) {
@@ -348,6 +356,7 @@ async function listModels() {
 }
 
 async function listRunningModels() {
+    showSpinner();  // Show spinner before request
     try {
         const response = await fetch('/api/running');
         if (!response.ok) {
@@ -362,6 +371,7 @@ async function listRunningModels() {
 }
 
 async function getVersion() {
+    showSpinner();  // Show spinner before request
     try {
         const response = await fetch('/api/version');
         if (!response.ok) {
@@ -378,6 +388,7 @@ async function getVersion() {
 // Create Model
 document.getElementById('createModelForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    showSpinner();  // Show spinner before request
     const form = e.target;
 
     try {
@@ -479,6 +490,7 @@ function updateModelOperationsForm() {
 
 document.getElementById('modelOperationsForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    showSpinner();  // Show spinner before request
     const form = e.target;
     const action = form.action.value;
     const source = form.source.value;
@@ -546,6 +558,7 @@ document.getElementById('modelOperationsForm').addEventListener('submit', async 
 // Embeddings
 document.getElementById('embeddingsForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    showSpinner();  // Show spinner before request
     const form = e.target;
 
     try {
