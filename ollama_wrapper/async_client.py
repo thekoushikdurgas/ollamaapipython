@@ -32,7 +32,10 @@ class AsyncOllamaClient:
         max_retries: int = 3,
         retry_delay: float = 1.0,
         rate_limit_requests: int = 10,
-        rate_limit_capacity: int = 10
+        rate_limit_capacity: int = 10,
+        pool_connections: int = 100,
+        pool_keepalive: int = 30,
+        pool_timeout: float = 10.0
     ):
         """Initialize Async Ollama API client
         Args:
@@ -42,6 +45,9 @@ class AsyncOllamaClient:
             retry_delay (float): Initial delay between retries in seconds (doubles with each retry)
             rate_limit_requests (int): Number of requests allowed per second
             rate_limit_capacity (int): Maximum burst capacity for rate limiter
+            pool_connections (int): Maximum number of connections to keep in pool
+            pool_keepalive (int): Keep alive timeout for pooled connections in seconds
+            pool_timeout (float): Timeout for acquiring a connection from pool
         """
         self.base_url = base_url or Config.OLLAMA_API_URL
         self.use_mock = use_mock if use_mock is not None else os.getenv('USE_MOCK_OLLAMA', '').lower() == 'true'
@@ -49,6 +55,11 @@ class AsyncOllamaClient:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.rate_limiter = RateLimiter()
+
+        # Connection pool settings
+        self.pool_connections = pool_connections
+        self.pool_keepalive = pool_keepalive
+        self.pool_timeout = pool_timeout
 
         # Configure rate limiters for different endpoints
         self._configure_rate_limiters(rate_limit_requests, rate_limit_capacity)
@@ -66,6 +77,35 @@ class AsyncOllamaClient:
         # Less aggressive rate limiting for lightweight endpoints
         self.rate_limiter.get_bucket(Config.VERSION_ENDPOINT, requests_per_second * 2, capacity * 2)
         self.rate_limiter.get_bucket(Config.LIST_MODELS_ENDPOINT, requests_per_second * 2, capacity * 2)
+
+    async def __aenter__(self):
+        """Create session for async context manager with connection pooling"""
+        if not self.use_mock:
+            conn = aiohttp.TCPConnector(
+                limit=self.pool_connections,
+                ttl_dns_cache=300,
+                keepalive_timeout=self.pool_keepalive
+            )
+            timeout = aiohttp.ClientTimeout(
+                total=self.pool_timeout,
+                connect=self.pool_timeout
+            )
+            self.session = aiohttp.ClientSession(
+                headers=Config.DEFAULT_HEADERS,
+                connector=conn,
+                timeout=timeout
+            )
+            logger.debug(f"Created connection pool with {self.pool_connections} connections")
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup session and connection pool"""
+        if self.session:
+            try:
+                await self.session.close()
+                logger.debug("Closed connection pool and cleaned up resources")
+            except Exception as e:
+                logger.error(f"Error closing session: {str(e)}")
 
     async def _handle_mock_request(
         self,
@@ -116,17 +156,6 @@ class AsyncOllamaClient:
 
         # For non-streaming responses, get first item from generator
         return next(mock_response)
-
-    async def __aenter__(self):
-        """Create session for async context manager"""
-        if not self.use_mock:
-            self.session = aiohttp.ClientSession(headers=Config.DEFAULT_HEADERS)
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Cleanup session for async context manager"""
-        if self.session:
-            await self.session.close()
 
     async def _make_request(
         self,
