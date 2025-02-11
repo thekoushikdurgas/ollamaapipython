@@ -99,48 +99,18 @@ class MockOllamaServer:
     def list_models(self) -> Dict[str, Any]:
         """Mock list models response"""
         try:
-            # Return mock model data instead of making real request
-            mock_models = {
-                "models": [
-                    {
-                        "name": "codellama:13b",
-                        "modified_at": "2024-02-11T14:56:49.277302595-07:00",
-                        "size": 7365960935,
-                        "digest": "9f438cb9cd581fc025612d27f7c1a6669ff83a8bb0ed86c94fcf4c5440555697",
-                        "details": {
-                            "format": "gguf",
-                            "family": "llama",
-                            "families": None,
-                            "parameter_size": "13B",
-                            "quantization_level": "Q4_0"
-                        }
-                    },
-                    {
-                        "name": "llama2:latest",
-                        "modified_at": "2024-02-11T09:32:18.757212583-08:00", 
-                        "size": 3825819519,
-                        "digest": "fe938a131f40e6f6d40083c9f0f430a515233eb2edaa6d72eb85c50d64f2300e",
-                        "details": {
-                            "format": "gguf",
-                            "family": "llama",
-                            "families": None,
-                            "parameter_size": "7B",
-                            "quantization_level": "Q4_0"
-                        }
-                    }
-                ]
-            }
+            response = requests.get(f"{Config.OLLAMA_API_URL}/api/models")
+            if not response.ok:
+                logger.error(f"Failed to fetch models: {response.status_code}")
+                return {"models": []}
 
-            # Add mock models to the instance models dict
-            for model in mock_models["models"]:
-                self.models[model["name"]] = model
-
-            logger.info(f"List models: {len(mock_models['models'])}")
-            return mock_models
-
+            data = response.json()
+            models = data.get("models", [])
+            logger.info(f"List models: {len(models)}")
+            return {"models": models}
         except Exception as e:
             logger.error(f"List models request failed: {str(e)}")
-            return {"models": []}
+            raise
 
     def show_model(self, model_name: str) -> Dict[str, Any]:
         """Mock show model response"""
