@@ -231,17 +231,18 @@ document
   .getElementById("generateForm")
   .addEventListener("submit", async (e) => {
     e.preventDefault();
-    showSpinner(); // Show spinner before request
+    showSpinner();
     const form = e.target;
     const responseArea = document.getElementById("generateResponse");
+    responseArea.innerHTML = ''; // Clear previous response
 
     try {
-      // Build request data with all supported options
       const data = {
         model: form.model.value,
         prompt: form.prompt.value,
         stream: form.stream.value === "true",
         raw: form.raw.value === "true",
+        suffix: '', // Support for suffix parameter
       };
 
       // Add optional fields if provided
@@ -316,24 +317,43 @@ document
       }
 
       if (data.stream) {
-        hideSpinner(); // Hide spinner before streaming starts
+        hideSpinner();
+        let fullResponse = '';
         await handleStreamingResponse(response, responseArea, (data) => {
-          // For structured outputs (JSON/schema), format the response
-          if (data.format === "json" || data.format?.type === "object") {
-            try {
-              return JSON.stringify(JSON.parse(data.response), null, 2) + "\n";
-            } catch {
-              return data.response;
+          if (data.response) {
+            fullResponse += data.response;
+            // For structured outputs, try to format JSON
+            if (data.format === "json" || data.format?.type === "object") {
+              try {
+                return JSON.stringify(JSON.parse(data.response), null, 2) + "\n";
+              } catch {
+                return data.response;
+              }
             }
+            return data.response;
           }
-          return data.response;
+          // Return additional information if available
+          if (data.total_duration) {
+            return `\n\nGeneration took: ${(data.total_duration / 1e9).toFixed(2)}s`;
+          }
+          return '';
         });
+        
+        // Show final statistics
+        if (fullResponse) {
+          const stats = document.createElement('div');
+          stats.className = 'text-muted mt-2';
+          stats.textContent = `Generated ${fullResponse.length} characters`;
+          responseArea.appendChild(stats);
+        }
       } else {
         const result = await response.json();
         showResponse("generateResponse", result);
       }
     } catch (error) {
-      showError("generateResponse", error.message);
+      hideSpinner();
+      showError("generateResponse", error.message || 'Failed to generate response');
+      console.error('Generation error:', error);
     }
   });
 
