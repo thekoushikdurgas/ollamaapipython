@@ -52,6 +52,32 @@ function showResponse(elementId, response) {
     </div>`;
 }
 
+async function handleStreamingResponse(response, responseArea, contentExtractor) {
+    responseArea.innerHTML = '';
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+            try {
+                const data = JSON.parse(line);
+                const content = contentExtractor(data);
+                if (content) {
+                    responseArea.innerHTML += content;
+                }
+            } catch (e) {
+                console.error('Error parsing streaming response:', e);
+            }
+        }
+    }
+}
+
 // Generate completion
 document.getElementById('generateForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -63,9 +89,14 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
             model: form.model.value,
             prompt: form.prompt.value,
             options: {
+                temperature: parseFloat(form.temperature.value) || undefined,
                 stream: form.stream.value === 'true'
             }
         };
+
+        if (form.system.value) {
+            data.system = form.system.value;
+        }
 
         const response = await fetch('/api/generate', {
             method: 'POST',
@@ -79,26 +110,7 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
         }
 
         if (data.options.stream) {
-            responseArea.innerHTML = ''; // Clear previous content
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n').filter(line => line.trim());
-
-                for (const line of lines) {
-                    try {
-                        const data = JSON.parse(line);
-                        responseArea.innerHTML += data.response;
-                    } catch (e) {
-                        console.error('Error parsing streaming response:', e);
-                    }
-                }
-            }
+            await handleStreamingResponse(response, responseArea, data => data.response);
         } else {
             const result = await response.json();
             showResponse('generateResponse', result);
@@ -108,7 +120,7 @@ document.getElementById('generateForm').addEventListener('submit', async (e) => 
     }
 });
 
-// Chat completion
+// Chat
 function addMessage() {
     const messagesDiv = document.getElementById('messages');
     const messageInput = document.createElement('div');
@@ -139,6 +151,9 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         const data = {
             model: form.model.value,
             messages: messages,
+            options: {
+                temperature: parseFloat(form.temperature.value) || undefined,
+            },
             stream: form.stream.value === 'true'
         };
 
@@ -154,28 +169,9 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
         }
 
         if (data.stream) {
-            responseArea.innerHTML = '';
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n').filter(line => line.trim());
-
-                for (const line of lines) {
-                    try {
-                        const data = JSON.parse(line);
-                        if (data.message && data.message.content) {
-                            responseArea.innerHTML += data.message.content;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing streaming response:', e);
-                    }
-                }
-            }
+            await handleStreamingResponse(response, responseArea, data => {
+                return data.message?.content || '';
+            });
         } else {
             const result = await response.json();
             showResponse('chatResponse', result);
@@ -185,7 +181,7 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
     }
 });
 
-// Model operations
+// Model listing and information
 async function listModels() {
     try {
         const response = await fetch('/api/models');
@@ -228,52 +224,102 @@ async function getVersion() {
     }
 }
 
-function updateModelForm() {
-    const action = document.querySelector('#modelManageForm [name="action"]').value;
-    const destinationField = document.getElementById('destinationField');
+// Create Model
+document.getElementById('createModelForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+
+    try {
+        const data = {
+            model: form.model.value,
+            stream: true
+        };
+
+        if (form.from_model.value) {
+            data.from = form.from_model.value;
+        }
+        if (form.system.value) {
+            data.system = form.system.value;
+        }
+        if (form.template.value) {
+            data.template = form.template.value;
+        }
+
+        const response = await fetch('/api/models', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create model');
+        }
+
+        await handleStreamingResponse(response, 
+            document.getElementById('createModelResponse'), 
+            data => data.status ? `${data.status}\n` : ''
+        );
+    } catch (error) {
+        showError('createModelResponse', error.message);
+    }
+});
+
+// Model Operations
+function updateModelOperationsForm() {
+    const action = document.querySelector('#modelOperationsForm [name="action"]').value;
+    const destinationField = document.getElementById('destinationModelField');
+    const streamField = document.querySelector('#modelOperationsForm [name="stream"]').parentElement;
 
     if (action === 'copy') {
         destinationField.classList.remove('d-none');
         destinationField.querySelector('input').required = true;
+        streamField.classList.add('d-none');
+    } else if (action === 'show' || action === 'delete') {
+        destinationField.classList.add('d-none');
+        destinationField.querySelector('input').required = false;
+        streamField.classList.add('d-none');
     } else {
         destinationField.classList.add('d-none');
         destinationField.querySelector('input').required = false;
+        streamField.classList.remove('d-none');
     }
 }
 
-document.getElementById('modelManageForm').addEventListener('submit', async (e) => {
+document.getElementById('modelOperationsForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
     const action = form.action.value;
-    const modelName = form.modelName.value;
+    const source = form.source.value;
     const destination = form.destination?.value;
+    const stream = form.stream.value === 'true';
 
     try {
         let url, method, data;
 
         switch (action) {
             case 'show':
-                url = `/api/show/${modelName}`;
+                url = `/api/show/${source}`;
                 method = 'GET';
                 break;
-            case 'pull':
-                url = '/api/models/pull';
-                method = 'POST';
-                data = { name: modelName };
-                break;
-            case 'push':
-                url = '/api/models/push';
-                method = 'POST';
-                data = { name: modelName };
-                break;
             case 'delete':
-                url = `/api/models/${modelName}`;
+                url = `/api/models/${source}`;
                 method = 'DELETE';
                 break;
             case 'copy':
                 url = '/api/models/copy';
                 method = 'POST';
-                data = { source: modelName, destination };
+                data = { source, destination };
+                break;
+            case 'pull':
+                url = '/api/models/pull';
+                method = 'POST';
+                data = { name: source, stream };
+                break;
+            case 'push':
+                url = '/api/models/push';
+                method = 'POST';
+                data = { name: source, stream };
                 break;
         }
 
@@ -288,10 +334,17 @@ document.getElementById('modelManageForm').addEventListener('submit', async (e) 
             throw new Error(error.error || `Failed to ${action} model`);
         }
 
-        const result = await response.json();
-        showResponse('modelManageResponse', result);
+        if (stream && (action === 'pull' || action === 'push')) {
+            await handleStreamingResponse(response, 
+                document.getElementById('modelOperationsResponse'), 
+                data => data.status ? `${data.status}\n` : ''
+            );
+        } else {
+            const result = await response.json();
+            showResponse('modelOperationsResponse', result);
+        }
     } catch (error) {
-        showError('modelManageResponse', error.message);
+        showError('modelOperationsResponse', error.message);
     }
 });
 
