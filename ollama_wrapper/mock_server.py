@@ -76,31 +76,28 @@ class MockOllamaServer:
         }
         yield {"status": f"Successfully created model {model_name}"}
 
-    async def list_models(self) -> Dict[str, Any]:
+    def list_models(self) -> Dict[str, Any]:
         """Mock list models response"""
-        """List available models"""
         try:
-            response = await self._make_request("GET", Config.LIST_MODELS_ENDPOINT)
             models_info = []
-            for model in response.models:
+            for model_name, model_data in self.models.items():
                 model_info = {
-                    'name': model.model,
-                    'size': f"{(model.size / 1024 / 1024):.2f} MB",
+                    'name': model_name,
+                    'size': f"{(model_data.get('size', 0) / 1024 / 1024):.2f} MB"
                 }
-                if model.details:
+                if 'details' in model_data:
                     model_info.update({
-                        'format': model.details.format,
-                        'family': model.details.family,
-                        'parameter_size': model.details.parameter_size,
-                        'quantization_level': model.details.quantization_level
+                        'format': model_data['details'].get('format'),
+                        'family': model_data['details'].get('family'),
+                        'parameter_size': model_data['details'].get('parameter_size'),
+                        'quantization_level': model_data['details'].get('quantization_level')
                     })
                 models_info.append(model_info)
-            logger.info(f"List models : {len(models_info)}")
-            return jsonify(models_info)
+            logger.info(f"List models: {len(models_info)}")
+            return {"models": models_info}
         except Exception as e:
             logger.error(f"List models request failed: {str(e)}")
             raise
-        return {"models": list(self.models.values())}
 
     def show_model(self, model_name: str) -> Dict[str, Any]:
         """Mock show model response"""
