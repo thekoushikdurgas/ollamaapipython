@@ -203,8 +203,13 @@ function addMessage() {
             <option value="user">User</option>
             <option value="assistant">Assistant</option>
             <option value="system">System</option>
+            <option value="tool">Tool</option>
         </select>
         <textarea class="form-control" name="content" rows="2" required></textarea>
+        <div class="mt-2">
+            <label class="form-label">Images (Optional, for multimodal models)</label>
+            <input type="file" class="form-control" name="images" multiple accept="image/*">
+        </div>
     `;
     messagesDiv.appendChild(messageInput);
 }
@@ -216,19 +221,70 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
     try {
         const messageInputs = form.querySelectorAll('.message-input');
-        const messages = Array.from(messageInputs).map(input => ({
-            role: input.querySelector('[name="role"]').value,
-            content: input.querySelector('[name="content"]').value
-        }));
+        const messages = [];
 
+        // Process each message with its images
+        for (const input of messageInputs) {
+            const message = {
+                role: input.querySelector('[name="role"]').value,
+                content: input.querySelector('[name="content"]').value
+            };
+
+            // Handle images for multimodal models
+            const imageFiles = input.querySelector('[name="images"]').files;
+            if (imageFiles.length > 0) {
+                const images = [];
+                for (const file of imageFiles) {
+                    const base64 = await readFileAsBase64(file);
+                    images.push(base64);
+                }
+                message.images = images;
+            }
+
+            messages.push(message);
+        }
+
+        // Build request data
         const data = {
             model: form.model.value,
             messages: messages,
-            options: {
-                temperature: parseFloat(form.temperature.value) || undefined,
-            },
             stream: form.stream.value === 'true'
         };
+
+        // Add format if specified
+        if (form.format.value) {
+            if (form.format.value === 'schema') {
+                data.format = {
+                    type: "object",
+                    properties: {
+                        response: {
+                            type: "string",
+                            description: "The chat response"
+                        }
+                    }
+                };
+            } else {
+                data.format = form.format.value;
+            }
+        }
+
+        // Add model options if provided
+        const options = {};
+        const numericFields = ['temperature', 'top_p', 'top_k', 'seed'];
+        numericFields.forEach(field => {
+            const value = form[field].value;
+            if (value !== '') {
+                options[field] = parseFloat(value);
+            }
+        });
+
+        if (form.keep_alive.value) {
+            options.keep_alive = form.keep_alive.value;
+        }
+
+        if (Object.keys(options).length > 0) {
+            data.options = options;
+        }
 
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -243,7 +299,18 @@ document.getElementById('chatForm').addEventListener('submit', async (e) => {
 
         if (data.stream) {
             await handleStreamingResponse(response, responseArea, data => {
-                return data.message?.content || '';
+                // For structured outputs (JSON/schema), format the response
+                if (data.message?.content) {
+                    if (data.format === 'json' || data.format?.type === 'object') {
+                        try {
+                            return JSON.stringify(JSON.parse(data.message.content), null, 2) + '\n';
+                        } catch {
+                            return data.message.content;
+                        }
+                    }
+                    return data.message.content;
+                }
+                return '';
             });
         } else {
             const result = await response.json();
