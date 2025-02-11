@@ -1,5 +1,6 @@
 """Mock server for Ollama API testing"""
 import time
+import requests
 from typing import Dict, Any, Generator, Optional
 # from flask import Flask, request, jsonify
 # from ollama_wrapper import logger
@@ -102,7 +103,7 @@ class MockOllamaServer:
             if not response.ok:
                 logger.error(f"Failed to fetch models: {response.status_code}")
                 return {"models": []}
-            
+
             data = response.json()
             models = data.get("models", [])
             logger.info(f"List models: {len(models)}")
