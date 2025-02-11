@@ -305,23 +305,9 @@ def list_models():
     """List available models endpoint"""
     try:
         response = client.list_models()
-        models_info = []
-        for model in response.models:
-                model_info = {
-                    'name': model.model,
-                    'size': f"{(model.size / 1024 / 1024):.2f} MB",
-                }
-                if model.details:
-                    model_info.update({
-                        'format': model.details.format,
-                        'family': model.details.family,
-                        'parameter_size': model.details.parameter_size,
-                        'quantization_level': model.details.quantization_level
-                    })
-                models_info.append(model_info)
-        logger.info(f"List models : {len(models_info)}")
-        return jsonify(models_info)
-        # return jsonify(response)
+        if isinstance(response, dict) and 'models' in response:
+            return jsonify(response['models'])
+        return jsonify([])
     except Exception as e:
         logger.error(f"List models endpoint error: {str(e)}")
         return handle_ollama_error(e)
