@@ -1,7 +1,7 @@
 """Mock server for Ollama API testing"""
 import time
 from typing import Dict, Any, Generator, Optional
-from flask import Flask, request, jsonify
+# from flask import Flask, request, jsonify
 # from ollama_wrapper import logger
 from ollama_wrapper.config import Config
 from .logger import setup_logger
@@ -102,28 +102,21 @@ class MockOllamaServer:
             for model_name, model_data in self.models.items():
                 model_info = {
                     'name': model_name,
-                    'size':
-                    f"{(model_data.get('size', 0) / 1024 / 1024):.2f} MB"
+                    'size': f"{(model_data.get('size', 0) / 1024 / 1024):.2f} MB"
                 }
                 if 'details' in model_data:
                     model_info.update({
-                        'format':
-                        model_data['details'].get('format'),
-                        'family':
-                        model_data['details'].get('family'),
-                        'parameter_size':
-                        model_data['details'].get('parameter_size'),
-                        'quantization_level':
-                        model_data['details'].get('quantization_level')
+                        'format': model_data['details'].get('format'),
+                        'family': model_data['details'].get('family'),
+                        'parameter_size': model_data['details'].get('parameter_size'),
+                        'quantization_level': model_data['details'].get('quantization_level')
                     })
                 models_info.append(model_info)
             logger.info(f"List models: {len(models_info)}")
-            self.models = jsonify(models_info)
             return {"models": models_info}
         except Exception as e:
             logger.error(f"List models request failed: {str(e)}")
             raise
-        # return {"models": list(self.models.values())}
 
     def show_model(self, model_name: str) -> Dict[str, Any]:
         """Mock show model response"""
