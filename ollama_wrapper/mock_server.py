@@ -1,39 +1,15 @@
 """Mock server for Ollama API testing"""
 import time
 from typing import Dict, Any, Generator, Optional
+from flask import Flask, request, jsonify
+from ollama_wrapper import logger
+from ollama_wrapper.config import Config
 
 class MockOllamaServer:
     """Mock implementation of Ollama server for testing"""
 
     def __init__(self):
-        self.models = {
-            "codellama": {
-                "name": "codellama:13b",
-                "modified_at": "2023-11-04T14:56:49.277302595-07:00",
-                "size": 7365960935,
-                "digest": "9f438cb9cd581fc025612d27f7c1a6669ff83a8bb0ed86c94fcf4c5440555697",
-                "details": {
-                    "format": "gguf",
-                    "family": "llama",
-                    "families": None,
-                    "parameter_size": "13B",
-                    "quantization_level": "Q4_0"
-                }
-            },
-            "llama3": {
-                "name": "llama3:latest",
-                "modified_at": "2023-12-07T09:32:18.757212583-08:00", 
-                "size": 3825819519,
-                "digest": "fe938a131f40e6f6d40083c9f0f430a515233eb2edaa6d72eb85c50d64f2300e",
-                "details": {
-                    "format": "gguf",
-                    "family": "llama",
-                    "families": None,
-                    "parameter_size": "7B",
-                    "quantization_level": "Q4_0"
-                }
-            }
-        }
+        self.models = {}
 
     def generate_response(self, model: str, prompt: str, stream: bool = True) -> Generator[Dict[str, Any], None, None]:
         """Mock generate completion response"""
@@ -100,8 +76,30 @@ class MockOllamaServer:
         }
         yield {"status": f"Successfully created model {model_name}"}
 
-    def list_models(self) -> Dict[str, Any]:
+    async def list_models(self) -> Dict[str, Any]:
         """Mock list models response"""
+        """List available models"""
+        try:
+            response = await self._make_request("GET", Config.LIST_MODELS_ENDPOINT)
+            models_info = []
+            for model in response.models:
+                model_info = {
+                    'name': model.model,
+                    'size': f"{(model.size / 1024 / 1024):.2f} MB",
+                }
+                if model.details:
+                    model_info.update({
+                        'format': model.details.format,
+                        'family': model.details.family,
+                        'parameter_size': model.details.parameter_size,
+                        'quantization_level': model.details.quantization_level
+                    })
+                models_info.append(model_info)
+            logger.info(f"List models : {len(models_info)}")
+            return jsonify(models_info)
+        except Exception as e:
+            logger.error(f"List models request failed: {str(e)}")
+            raise
         return {"models": list(self.models.values())}
 
     def show_model(self, model_name: str) -> Dict[str, Any]:

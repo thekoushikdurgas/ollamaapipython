@@ -379,6 +379,7 @@ async function listModels() {
             throw new Error(error.error || 'Failed to list models');
         }
         const result = await response.json();
+        console.log(result);
         showResponse('modelsResponse', result);
     } catch (error) {
         showError('modelsResponse', error.message);
