@@ -98,19 +98,36 @@ class MockOllamaServer:
 
     def list_models(self) -> Dict[str, Any]:
         """Mock list models response"""
-        try:
-            response = requests.get(f"{Config.OLLAMA_API_URL}/api/models")
-            if not response.ok:
-                logger.error(f"Failed to fetch models: {response.status_code}")
-                return {"models": []}
-
-            data = response.json()
-            models = data.get("models", [])
-            logger.info(f"List models: {len(models)}")
-            return {"models": models}
-        except Exception as e:
-            logger.error(f"List models request failed: {str(e)}")
-            raise
+        return {
+            "models": [
+                {
+                    "name": "mock-model:latest",
+                    "modified_at": "2024-02-11T10:00:00Z",
+                    "size": 4000000000,
+                    "digest": "sha256:mock123",
+                    "details": {
+                        "format": "gguf",
+                        "family": "llama",
+                        "families": ["llama"],
+                        "parameter_size": "7B",
+                        "quantization_level": "Q4_0"
+                    }
+                },
+                {
+                    "name": "mock-code:latest", 
+                    "modified_at": "2024-02-11T10:00:00Z",
+                    "size": 3000000000,
+                    "digest": "sha256:mock456",
+                    "details": {
+                        "format": "gguf",
+                        "family": "codellama",
+                        "families": ["llama"],
+                        "parameter_size": "7B",
+                        "quantization_level": "Q4_K_M"
+                    }
+                }
+            ]
+        }
 
     def show_model(self, model_name: str) -> Dict[str, Any]:
         """Mock show model response"""
