@@ -89,9 +89,44 @@ class ChatResponse(BaseModel):
     prompt_eval_duration: Optional[int] = None
     eval_duration: Optional[int] = None
 
+class ModelInfo(BaseModel):
+    format: str
+    family: str
+    families: Optional[List[str]] = None
+    parameter_size: str
+    quantization_level: Optional[str] = None
+
+class ModelDetails(BaseModel):
+    name: str
+    modified_at: str
+    size: int
+    digest: str
+    details: ModelInfo
+
+class ModelListResponse(BaseModel):
+    models: List[ModelDetails]
+
 class ModelResponse(BaseModel):
     status: str
     error: Optional[str] = None
+
+class ModelCopyRequest(BaseModel):
+    source: str
+    destination: str
+
+class ModelPullRequest(BaseModel):
+    name: str
+    insecure: Optional[bool] = None
+    stream: Optional[bool] = True
+
+class ModelPushRequest(BaseModel):
+    name: str
+    insecure: Optional[bool] = None
+    stream: Optional[bool] = True
+
+class ShowModelRequest(BaseModel):
+    model: str
+    verbose: Optional[bool] = None
 
 class EmbeddingRequest(BaseModel):
     model: str

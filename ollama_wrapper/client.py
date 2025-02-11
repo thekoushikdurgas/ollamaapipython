@@ -1,5 +1,6 @@
 import requests
 from typing import Generator, Dict, Any, Optional, Union, List
+import os
 from .config import Config
 from .models import (
     GenerateRequest, GenerateResponse,
@@ -15,20 +16,29 @@ from .exceptions import (
 )
 from .logger import setup_logger
 from .utils import validate_model_name
+from .mock_server import MockOllamaServer
 import json
 
 logger = setup_logger(__name__)
 
 class OllamaClient:
-    def __init__(self, base_url: Optional[str] = None):
+    def __init__(self, base_url: Optional[str] = None, use_mock: Optional[bool] = None):
         """Initialize Ollama API client
         Args:
             base_url (str, optional): Base URL for Ollama API. Defaults to Config.OLLAMA_API_URL.
+            use_mock (bool, optional): Force use of mock server. Defaults to None (uses env var).
         """
         self.base_url = base_url or Config.OLLAMA_API_URL
-        self.session = requests.Session()
-        self.session.headers.update(Config.DEFAULT_HEADERS)
-        logger.info(f"Initialized Ollama client with base URL: {self.base_url}")
+        # Check if mock mode is enabled via environment variable or parameter
+        self.use_mock = use_mock if use_mock is not None else os.getenv('USE_MOCK_OLLAMA', '').lower() == 'true'
+
+        if self.use_mock:
+            logger.info("Using mock Ollama server for development/testing")
+            self.mock_server = MockOllamaServer()
+        else:
+            self.session = requests.Session()
+            self.session.headers.update(Config.DEFAULT_HEADERS)
+            logger.info(f"Initialized Ollama client with base URL: {self.base_url}")
 
     def _make_request(
         self,
@@ -39,6 +49,9 @@ class OllamaClient:
         timeout: int = Config.DEFAULT_TIMEOUT
     ) -> Union[Dict[str, Any], Generator[Dict[str, Any], None, None]]:
         """Make HTTP request to Ollama API with proper error handling"""
+        if self.use_mock:
+            return self._handle_mock_request(method, endpoint, data, stream)
+
         url = f"{self.base_url}{endpoint}"
         response = None
 
@@ -90,10 +103,43 @@ class OllamaClient:
             except (json.JSONDecodeError, AttributeError):
                 pass
             logger.error(f"HTTP error occurred: {error_msg}")
-            raise OllamaRequestError(error_msg, status_code)
+            raise OllamaRequestError(error_msg, status_code=status_code)
         except Exception as e:
             logger.error(f"Unexpected error: {str(e)}")
             raise OllamaRequestError(f"Unexpected error: {str(e)}")
+
+    def _handle_mock_request(
+        self,
+        method: str,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        stream: bool = False
+    ) -> Union[Dict[str, Any], Generator[Dict[str, Any], None, None]]:
+        """Handle requests in mock mode"""
+        if endpoint == Config.GENERATE_ENDPOINT:
+            return self.mock_server.generate_response(
+                data['model'],
+                data['prompt'],
+                stream=data.get('stream', True)
+            )
+        elif endpoint == Config.CHAT_ENDPOINT:
+            return self.mock_server.chat_response(
+                data['model'],
+                data['messages'],
+                stream=data.get('stream', True)
+            )
+        elif endpoint == Config.CREATE_MODEL_ENDPOINT:
+            return self.mock_server.create_model(data['model'], **data)
+        elif endpoint == Config.LIST_MODELS_ENDPOINT:
+            return self.mock_server.list_models()
+        elif endpoint == Config.SHOW_MODEL_ENDPOINT:
+            return self.mock_server.show_model(data['name'])
+        elif endpoint == Config.EMBEDDINGS_ENDPOINT:
+            return self.mock_server.create_embedding(data['model'], data['prompt'])
+        elif endpoint == Config.VERSION_ENDPOINT:
+            return self.mock_server.get_version()
+        else:
+            raise OllamaRequestError(f"Mock server does not support endpoint: {endpoint}")
 
     def _stream_response(self, response: requests.Response) -> Generator[Dict[str, Any], None, None]:
         """Stream response from Ollama API with error handling"""
