@@ -1,4 +1,5 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "web", "nodejs-20"]
+run = "python app.py"
 
 [nix]
 channel = "stable-24_05"
@@ -67,7 +68,7 @@ args = "python app.py"
 waitForPort = 5000
 
 [deployment]
-run = ["sh", "-c", "python -c 'from ollama_wrapper import OllamaClient; print(\"Ollama API Wrapper is ready to use!\")'"]
+run = ["sh", "-c", "python app.py"]
 
 [[ports]]
 localPort = 5000
