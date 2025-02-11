@@ -1,6 +1,7 @@
 import requests
 from typing import Generator, Dict, Any, Optional, Union, List
 import os
+from requests.adapters import HTTPAdapter, Retry
 from .config import Config
 from .models import (
     GenerateRequest, GenerateResponse,
@@ -17,28 +18,87 @@ from .exceptions import (
 from .logger import setup_logger
 from .utils import validate_model_name
 from .mock_server import MockOllamaServer
+from .sync_rate_limiter import SyncRateLimiter
 import json
 
 logger = setup_logger(__name__)
 
 class OllamaClient:
-    def __init__(self, base_url: Optional[str] = None, use_mock: Optional[bool] = None):
+    def __init__(
+        self, 
+        base_url: Optional[str] = None, 
+        use_mock: Optional[bool] = None,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        rate_limit_requests: int = 10,
+        rate_limit_capacity: int = 10,
+        pool_connections: int = 100,
+        pool_maxsize: int = 100,
+        pool_keepalive: int = 30
+    ):
         """Initialize Ollama API client
         Args:
             base_url (str, optional): Base URL for Ollama API. Defaults to Config.OLLAMA_API_URL.
             use_mock (bool, optional): Force use of mock server. Defaults to None (uses env var).
+            max_retries (int): Maximum number of retry attempts
+            retry_delay (float): Initial delay between retries
+            rate_limit_requests (int): Requests per second
+            rate_limit_capacity (int): Maximum burst capacity
+            pool_connections (int): Number of urllib3 connection pools to cache
+            pool_maxsize (int): Maximum number of connections to save in the pool
+            pool_keepalive (int): Keep-alive timeout for pooled connections
         """
         self.base_url = base_url or Config.OLLAMA_API_URL
-        # Check if mock mode is enabled via environment variable or parameter
         self.use_mock = use_mock if use_mock is not None else os.getenv('USE_MOCK_OLLAMA', '').lower() == 'true'
 
         if self.use_mock:
             logger.info("Using mock Ollama server for development/testing")
             self.mock_server = MockOllamaServer()
         else:
+            # Initialize connection pool
             self.session = requests.Session()
+
+            # Configure connection pooling
+            adapter = HTTPAdapter(
+                pool_connections=pool_connections,
+                pool_maxsize=pool_maxsize,
+                pool_block=False,
+                max_retries=Retry(
+                    total=max_retries,
+                    backoff_factor=retry_delay,
+                    status_forcelist=[500, 502, 503, 504]
+                )
+            )
+            self.session.mount('http://', adapter)
+            self.session.mount('https://', adapter)
             self.session.headers.update(Config.DEFAULT_HEADERS)
-            logger.info(f"Initialized Ollama client with base URL: {self.base_url}")
+
+            # Initialize rate limiter
+            self.rate_limiter = SyncRateLimiter()
+            self._configure_rate_limiters(rate_limit_requests, rate_limit_capacity)
+
+        logger.info(f"Initialized Ollama client with base URL: {self.base_url}")
+
+    def _configure_rate_limiters(self, requests_per_second: int, capacity: int):
+        """Configure rate limiters for different endpoints"""
+        self.rate_limiter.get_bucket(Config.GENERATE_ENDPOINT, requests_per_second, capacity)
+        self.rate_limiter.get_bucket(Config.CHAT_ENDPOINT, requests_per_second, capacity)
+        self.rate_limiter.get_bucket(Config.VERSION_ENDPOINT, requests_per_second * 2, capacity * 2)
+        self.rate_limiter.get_bucket(Config.LIST_MODELS_ENDPOINT, requests_per_second * 2, capacity * 2)
+
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with proper cleanup"""
+        if not self.use_mock and self.session:
+            self.session.close()
+
+    def close(self):
+        """Explicitly close the client and cleanup resources"""
+        if not self.use_mock and self.session:
+            self.session.close()
 
     def _make_request(
         self,
@@ -56,6 +116,7 @@ class OllamaClient:
         response = None
 
         try:
+            self.rate_limiter.wait(endpoint) #Added rate limiting
             logger.debug(f"Making {method} request to {url}")
             if data:
                 logger.debug(f"Request data: {json.dumps(data, indent=2)}")
