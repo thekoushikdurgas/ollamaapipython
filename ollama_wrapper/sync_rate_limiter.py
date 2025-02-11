@@ -58,8 +58,8 @@ class SyncRateLimiter:
                 )
             return self._buckets[key]
 
-    def acquire(self, key: str, tokens: float = 1.0) -> None:
-        """Acquire tokens for the given key
+    def wait(self, key: str, tokens: float = 1.0) -> None:
+        """Wait for tokens to become available for the given key
         Args:
             key (str): Rate limit key (e.g. endpoint name)
             tokens (float): Number of tokens to acquire
@@ -68,3 +68,11 @@ class SyncRateLimiter:
         wait_time = bucket.acquire(tokens)
         if wait_time > 0:
             time.sleep(wait_time)
+
+    def acquire(self, key: str, tokens: float = 1.0) -> None:
+        """Acquire tokens for the given key (alias for wait)
+        Args:
+            key (str): Rate limit key (e.g. endpoint name)
+            tokens (float): Number of tokens to acquire
+        """
+        self.wait(key, tokens)
