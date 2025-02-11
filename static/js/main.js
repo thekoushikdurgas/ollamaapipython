@@ -38,25 +38,22 @@ async function populateModelDropdowns() {
         const data = await response.json();
         const models = data.models || [];
         
-        // Get all model input fields
-        const modelInputs = document.querySelectorAll('input[name="model"]');
+        // Get all model select elements
+        const modelSelects = document.querySelectorAll('select[name="model"]');
         
-        // Replace each input with a select
-        modelInputs.forEach(input => {
-            const select = document.createElement('select');
-            select.className = input.className;
-            select.name = input.name;
-            select.required = input.required;
-            
-            // Add empty option
-            select.innerHTML = '<option value="">Select a model</option>';
+        modelSelects.forEach(select => {
+            // Clear existing options except the first one
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
             
             // Add model options
             models.forEach(model => {
-                select.innerHTML += `<option value="${model.name}">${model.name}</option>`;
+                const option = document.createElement('option');
+                option.value = model.name;
+                option.textContent = `${model.name} (${model.details.parameter_size}, ${model.details.quantization_level})`;
+                select.appendChild(option);
             });
-            
-            input.parentNode.replaceChild(select, input);
         });
     } catch (error) {
         console.error('Failed to load models:', error);
