@@ -78,6 +78,17 @@ async function handleStreamingResponse(response, responseArea, contentExtractor)
     }
 }
 
+// Add this function for model file handling
+function addModelFile() {
+    const filesDiv = document.getElementById('modelFiles');
+    const fileInput = document.createElement('div');
+    fileInput.className = 'col-md-6 mt-2';
+    fileInput.innerHTML = `
+        <input type="file" class="form-control" name="modelFile" accept=".gguf,.safetensors,application/json">
+    `;
+    filesDiv.appendChild(fileInput);
+}
+
 // Generate completion
 document.getElementById('generateForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -384,6 +395,37 @@ document.getElementById('createModelForm').addEventListener('submit', async (e) 
         if (form.template.value) {
             data.template = form.template.value;
         }
+        if (form.quantize.value) {
+            data.quantize = form.quantize.value;
+        }
+
+        // Handle model files
+        const fileInputs = form.querySelectorAll('[name="modelFile"]');
+        if (fileInputs.length > 0) {
+            const files = {};
+            for (const input of fileInputs) {
+                if (input.files.length > 0) {
+                    const file = input.files[0];
+                    const arrayBuffer = await file.arrayBuffer();
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+                    // Upload blob first
+                    const blobResponse = await fetch(`/api/blobs/sha256:${hashHex}`, {
+                        method: 'POST',
+                        body: file
+                    });
+
+                    if (blobResponse.ok) {
+                        files[file.name] = `sha256:${hashHex}`;
+                    }
+                }
+            }
+            if (Object.keys(files).length > 0) {
+                data.files = files;
+            }
+        }
 
         const response = await fetch('/api/models', {
             method: 'POST',
@@ -409,19 +451,28 @@ document.getElementById('createModelForm').addEventListener('submit', async (e) 
 function updateModelOperationsForm() {
     const action = document.querySelector('#modelOperationsForm [name="action"]').value;
     const destinationField = document.getElementById('destinationModelField');
+    const showOptionsField = document.getElementById('showOptionsField');
     const streamField = document.querySelector('#modelOperationsForm [name="stream"]').parentElement;
 
     if (action === 'copy') {
         destinationField.classList.remove('d-none');
         destinationField.querySelector('input').required = true;
+        showOptionsField.classList.add('d-none');
         streamField.classList.add('d-none');
-    } else if (action === 'show' || action === 'delete') {
+    } else if (action === 'show') {
         destinationField.classList.add('d-none');
         destinationField.querySelector('input').required = false;
+        showOptionsField.classList.remove('d-none');
+        streamField.classList.add('d-none');
+    } else if (action === 'delete') {
+        destinationField.classList.add('d-none');
+        destinationField.querySelector('input').required = false;
+        showOptionsField.classList.add('d-none');
         streamField.classList.add('d-none');
     } else {
         destinationField.classList.add('d-none');
         destinationField.querySelector('input').required = false;
+        showOptionsField.classList.add('d-none');
         streamField.classList.remove('d-none');
     }
 }
@@ -433,17 +484,21 @@ document.getElementById('modelOperationsForm').addEventListener('submit', async 
     const source = form.source.value;
     const destination = form.destination?.value;
     const stream = form.stream.value === 'true';
+    const verbose = form.verbose?.checked;
 
     try {
         let url, method, data;
 
         switch (action) {
             case 'show':
-                url = `/api/show/${source}`;
+                url = `/api/show/${encodeURIComponent(source)}`;
                 method = 'GET';
+                if (verbose) {
+                    url += '?verbose=true';
+                }
                 break;
             case 'delete':
-                url = `/api/models/${source}`;
+                url = `/api/models/${encodeURIComponent(source)}`;
                 method = 'DELETE';
                 break;
             case 'copy':
