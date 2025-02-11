@@ -2,8 +2,12 @@
 import time
 from typing import Dict, Any, Generator, Optional
 from flask import Flask, request, jsonify
-from ollama_wrapper import logger
+# from ollama_wrapper import logger
 from ollama_wrapper.config import Config
+from .logger import setup_logger
+
+logger = setup_logger(__name__)
+
 
 class MockOllamaServer:
     """Mock implementation of Ollama server for testing"""
@@ -11,7 +15,11 @@ class MockOllamaServer:
     def __init__(self):
         self.models = {}
 
-    def generate_response(self, model: str, prompt: str, stream: bool = True) -> Generator[Dict[str, Any], None, None]:
+    def generate_response(
+            self,
+            model: str,
+            prompt: str,
+            stream: bool = True) -> Generator[Dict[str, Any], None, None]:
         """Mock generate completion response"""
         if not model or not prompt:
             raise ValueError("Model and prompt are required")
@@ -33,7 +41,11 @@ class MockOllamaServer:
         else:
             yield response
 
-    def chat_response(self, model: str, messages: list, stream: bool = True) -> Generator[Dict[str, Any], None, None]:
+    def chat_response(
+            self,
+            model: str,
+            messages: list,
+            stream: bool = True) -> Generator[Dict[str, Any], None, None]:
         """Mock chat completion response"""
         if not model or not messages:
             raise ValueError("Model and messages are required")
@@ -52,12 +64,19 @@ class MockOllamaServer:
             words = response["message"]["content"].split()
             for word in words:
                 time.sleep(0.1)
-                yield {**response, "message": {"role": "assistant", "content": word + " "}, "done": False}
+                yield {
+                    **response, "message": {
+                        "role": "assistant",
+                        "content": word + " "
+                    },
+                    "done": False
+                }
             yield {**response, "done": True}
         else:
             yield response
 
-    def create_model(self, model_name: str, **kwargs) -> Generator[Dict[str, Any], None, None]:
+    def create_model(self, model_name: str,
+                     **kwargs) -> Generator[Dict[str, Any], None, None]:
         """Mock model creation response"""
         if not model_name:
             raise ValueError("Model name is required")
@@ -76,31 +95,35 @@ class MockOllamaServer:
         }
         yield {"status": f"Successfully created model {model_name}"}
 
-    async def list_models(self) -> Dict[str, Any]:
+    def list_models(self) -> Dict[str, Any]:
         """Mock list models response"""
-        """List available models"""
         try:
-            response = await self._make_request("GET", Config.LIST_MODELS_ENDPOINT)
             models_info = []
-            for model in response.models:
+            for model_name, model_data in self.models.items():
                 model_info = {
-                    'name': model.model,
-                    'size': f"{(model.size / 1024 / 1024):.2f} MB",
+                    'name': model_name,
+                    'size':
+                    f"{(model_data.get('size', 0) / 1024 / 1024):.2f} MB"
                 }
-                if model.details:
+                if 'details' in model_data:
                     model_info.update({
-                        'format': model.details.format,
-                        'family': model.details.family,
-                        'parameter_size': model.details.parameter_size,
-                        'quantization_level': model.details.quantization_level
+                        'format':
+                        model_data['details'].get('format'),
+                        'family':
+                        model_data['details'].get('family'),
+                        'parameter_size':
+                        model_data['details'].get('parameter_size'),
+                        'quantization_level':
+                        model_data['details'].get('quantization_level')
                     })
                 models_info.append(model_info)
-            logger.info(f"List models : {len(models_info)}")
-            return jsonify(models_info)
+            logger.info(f"List models: {len(models_info)}")
+            self.models = jsonify(models_info)
+            return {"models": models_info}
         except Exception as e:
             logger.error(f"List models request failed: {str(e)}")
             raise
-        return {"models": list(self.models.values())}
+        # return {"models": list(self.models.values())}
 
     def show_model(self, model_name: str) -> Dict[str, Any]:
         """Mock show model response"""

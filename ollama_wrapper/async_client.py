@@ -18,11 +18,11 @@ from .exceptions import (
     OllamaValidationError
 )
 from .logger import setup_logger
+logger = setup_logger(__name__)
 from .utils import validate_model_name
 from .mock_server import MockOllamaServer
 from .rate_limiter import RateLimiter
 
-logger = setup_logger(__name__)
 
 class AsyncOllamaClient:
     def __init__(
@@ -67,6 +67,7 @@ class AsyncOllamaClient:
         if self.use_mock:
             logger.info("Using mock Ollama server for development/testing")
             self.mock_server = MockOllamaServer()
+            self.mock_server.list_models()
         logger.info(f"Initialized Async Ollama client with base URL: {self.base_url}")
 
     def _configure_rate_limiters(self, requests_per_second: int, capacity: int):

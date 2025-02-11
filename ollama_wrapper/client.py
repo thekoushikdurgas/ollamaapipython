@@ -16,12 +16,12 @@ from .exceptions import (
     OllamaValidationError
 )
 from .logger import setup_logger
+logger = setup_logger(__name__)
 from .utils import validate_model_name
 from .mock_server import MockOllamaServer
 from .sync_rate_limiter import SyncRateLimiter
 import json
 
-logger = setup_logger(__name__)
 
 class OllamaClient:
     def __init__(
@@ -54,6 +54,7 @@ class OllamaClient:
         if self.use_mock:
             logger.info("Using mock Ollama server for development/testing")
             self.mock_server = MockOllamaServer()
+            self.mock_server.list_models()
         else:
             # Initialize connection pool
             self.session = requests.Session()
