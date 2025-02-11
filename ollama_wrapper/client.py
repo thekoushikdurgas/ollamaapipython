@@ -320,10 +320,15 @@ class OllamaClient:
     def list_models(self) -> Dict[str, Any]:
         """List available models"""
         try:
-            response = self._make_request("GET", Config.LIST_MODELS_ENDPOINT)
-            if isinstance(response, Generator):
-                return next(response)  # Get first response for non-streaming endpoint
-            return response
+            response = requests.get(f"{self.base_url}/api/models")
+            if not response.ok:
+                logger.error(f"Failed to fetch models: {response.status_code}")
+                return {"models": []}
+            
+            data = response.json()
+            models = data.get("models", [])
+            logger.info(f"List models: {len(models)}")
+            return {"models": models}
         except Exception as e:
             logger.error(f"List models request failed: {str(e)}")
             raise

@@ -360,7 +360,16 @@ class AsyncOllamaClient:
     async def list_models(self) -> Dict[str, Any]:
         """List available models asynchronously"""
         try:
-            return await self._make_request("GET", Config.LIST_MODELS_ENDPOINT)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.base_url}/api/models") as response:
+                    if response.status != 200:
+                        logger.error(f"Failed to fetch models: {response.status}")
+                        return {"models": []}
+                    
+                    data = await response.json()
+                    models = data.get("models", [])
+                    logger.info(f"List models: {len(models)}")
+                    return {"models": models}
         except Exception as e:
             logger.error(f"List models request failed: {str(e)}")
             raise
