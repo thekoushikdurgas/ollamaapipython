@@ -14,6 +14,7 @@ from .exceptions import (
     OllamaValidationError
 )
 from .logger import setup_logger
+from .utils import validate_model_name
 import json
 
 logger = setup_logger(__name__)
@@ -27,6 +28,7 @@ class OllamaClient:
         self.base_url = base_url or Config.OLLAMA_API_URL
         self.session = requests.Session()
         self.session.headers.update(Config.DEFAULT_HEADERS)
+        logger.info(f"Initialized Ollama client with base URL: {self.base_url}")
 
     def _make_request(
         self,
@@ -42,7 +44,8 @@ class OllamaClient:
 
         try:
             logger.debug(f"Making {method} request to {url}")
-            logger.debug(f"Request data: {data}")
+            if data:
+                logger.debug(f"Request data: {json.dumps(data, indent=2)}")
 
             response = self.session.request(
                 method=method,
@@ -65,14 +68,29 @@ class OllamaClient:
 
         except requests.Timeout:
             logger.error(f"Request timed out after {timeout} seconds")
-            raise OllamaTimeoutError(f"Request timed out after {timeout} seconds")
+            raise OllamaTimeoutError(
+                f"Request to {url} timed out after {timeout} seconds. "
+                "Please check if Ollama server is running and responsive."
+            )
+        except requests.ConnectionError as e:
+            logger.error(f"Connection error: {str(e)}")
+            raise OllamaRequestError(
+                f"Failed to connect to Ollama server at {self.base_url}. "
+                "Please ensure Ollama is installed and running. "
+                "Visit https://ollama.ai/download for installation instructions.",
+                status_code=503
+            )
         except requests.HTTPError as e:
             status_code = response.status_code if response else None
-            logger.error(f"HTTP error occurred: {str(e)}")
-            raise OllamaRequestError(f"HTTP error occurred: {str(e)}", status_code)
-        except requests.RequestException as e:
-            logger.error(f"Request failed: {str(e)}")
-            raise OllamaRequestError(f"Request failed: {str(e)}")
+            error_msg = f"HTTP {status_code} error occurred"
+            try:
+                error_data = response.json() if response else None
+                if error_data and "error" in error_data:
+                    error_msg = error_data["error"]
+            except (json.JSONDecodeError, AttributeError):
+                pass
+            logger.error(f"HTTP error occurred: {error_msg}")
+            raise OllamaRequestError(error_msg, status_code)
         except Exception as e:
             logger.error(f"Unexpected error: {str(e)}")
             raise OllamaRequestError(f"Unexpected error: {str(e)}")
@@ -104,6 +122,9 @@ class OllamaClient:
         try:
             if not request.model:
                 raise OllamaValidationError("Model name is required")
+
+            # Validate model name format
+            request.model = validate_model_name(request.model)
 
             stream = request.options.stream if request.options else True
             response = self._make_request(
@@ -137,6 +158,9 @@ class OllamaClient:
             if not request.messages:
                 raise OllamaValidationError("Messages are required")
 
+            # Validate model name format
+            request.model = validate_model_name(request.model)
+
             stream = request.stream if request.stream is not None else True
             response = self._make_request(
                 "POST",
@@ -163,6 +187,11 @@ class OllamaClient:
         try:
             if not request.model:
                 raise OllamaValidationError("Model name is required")
+
+            # Validate model names format
+            request.model = validate_model_name(request.model)
+            if request.from_model:
+                request.from_model = validate_model_name(request.from_model)
 
             stream = request.stream if request.stream is not None else True
             response = self._make_request(
@@ -191,11 +220,25 @@ class OllamaClient:
             logger.error(f"List models request failed: {str(e)}")
             raise
 
+    def list_running_models(self) -> Dict[str, Any]:
+        """List running models"""
+        try:
+            response = self._make_request("GET", Config.RUNNING_MODELS_ENDPOINT)
+            if isinstance(response, Generator):
+                return next(response)  # Get first response for non-streaming endpoint
+            return response
+        except Exception as e:
+            logger.error(f"List running models request failed: {str(e)}")
+            raise
+
     def show_model(self, model_name: str) -> Dict[str, Any]:
         """Show model information"""
         try:
             if not model_name:
                 raise OllamaValidationError("Model name is required")
+
+            # Validate model name format
+            model_name = validate_model_name(model_name)
 
             response = self._make_request(
                 "POST",
@@ -215,6 +258,10 @@ class OllamaClient:
             if not source or not destination:
                 raise OllamaValidationError("Source and destination model names are required")
 
+            # Validate model names format
+            source = validate_model_name(source)
+            destination = validate_model_name(destination)
+
             response = self._make_request(
                 "POST",
                 Config.COPY_MODEL_ENDPOINT,
@@ -233,6 +280,9 @@ class OllamaClient:
             if not model_name:
                 raise OllamaValidationError("Model name is required")
 
+            # Validate model name format
+            model_name = validate_model_name(model_name)
+
             response = self._make_request(
                 "DELETE",
                 Config.DELETE_MODEL_ENDPOINT,
@@ -250,6 +300,9 @@ class OllamaClient:
         try:
             if not model_name:
                 raise OllamaValidationError("Model name is required")
+
+            # Validate model name format
+            model_name = validate_model_name(model_name)
 
             response = self._make_request(
                 "POST",
@@ -271,6 +324,9 @@ class OllamaClient:
         try:
             if not model_name:
                 raise OllamaValidationError("Model name is required")
+
+            # Validate model name format
+            model_name = validate_model_name(model_name)
 
             response = self._make_request(
                 "POST",
@@ -300,6 +356,9 @@ class OllamaClient:
             if not request.prompt:
                 raise OllamaValidationError("Prompt is required")
 
+            # Validate model name format
+            request.model = validate_model_name(request.model)
+
             response = self._make_request(
                 "POST",
                 Config.EMBEDDINGS_ENDPOINT,
@@ -310,4 +369,15 @@ class OllamaClient:
             return EmbeddingResponse(**response)
         except Exception as e:
             logger.error(f"Create embedding request failed: {str(e)}")
+            raise
+
+    def get_version(self) -> Dict[str, Any]:
+        """Get Ollama version information"""
+        try:
+            response = self._make_request("GET", Config.VERSION_ENDPOINT)
+            if isinstance(response, Generator):
+                return next(response)  # Get first response for non-streaming endpoint
+            return response
+        except Exception as e:
+            logger.error(f"Version request failed: {str(e)}")
             raise

@@ -1,0 +1,56 @@
+.response-area {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.message-input {
+    border: 1px solid #dee2e6;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: bold;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.error-message {
+    color: #dc3545;
+    margin-top: 0.5rem;
+    padding: 1rem;
+    background-color: #fce4e4;
+    border: 1px solid #fcc2c3;
+    border-radius: 0.25rem;
+}
+
+.error-message em {
+    display: block;
+    margin-top: 0.5rem;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.error-message a {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.success-message {
+    color: #28a745;
+    margin-top: 0.5rem;
+    padding: 1rem;
+    background-color: #e8f5e9;
+    border: 1px solid #c8e6c9;
+    border-radius: 0.25rem;
+}

@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory, render_template
 from ollama_wrapper import OllamaClient
 from ollama_wrapper.models import (
     GenerateRequest, ChatRequest, CreateModelRequest,
@@ -9,6 +9,7 @@ from ollama_wrapper.exceptions import (
     OllamaResponseError, OllamaValidationError,
     OllamaTimeoutError
 )
+from ollama_wrapper.utils import validate_model_name
 import logging
 from typing import Any, Dict, Generator
 
@@ -17,6 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True # Enable template reloading
 client = OllamaClient()
 
 def handle_streaming_response(response: Generator) -> Flask.response_class:
@@ -35,20 +37,31 @@ def handle_ollama_error(error):
     """Handle Ollama API errors"""
     if isinstance(error, OllamaRequestError):
         status_code = error.status_code or 500
-        message = "Failed to connect to Ollama server. Is it running?"
+        if "Failed to connect to Ollama server" in str(error):
+            message = (
+                "Failed to connect to Ollama server. "
+                "Please ensure Ollama is installed and running. "
+                "Visit https://ollama.ai/download for installation instructions."
+            )
+        else:
+            message = str(error)
     elif isinstance(error, OllamaValidationError):
         status_code = 400
         message = str(error)
     elif isinstance(error, OllamaTimeoutError):
         status_code = 504
-        message = "Request to Ollama server timed out"
+        message = (
+            "Request to Ollama server timed out. "
+            "Please check if the server is running and responsive."
+        )
     else:
         status_code = 500
         message = str(error)
 
     error_response = {
         "error": message,
-        "type": error.__class__.__name__
+        "type": error.__class__.__name__,
+        "status_code": status_code
     }
     logger.error(f"API Error: {error_response}")
     return jsonify(error_response), status_code
@@ -60,6 +73,10 @@ def generate():
         data = request.get_json()
         if not data:
             raise OllamaValidationError("No JSON data provided")
+
+        # Validate model name format
+        if 'model' in data:
+            data['model'] = validate_model_name(data['model'])
 
         # Create generate request
         request_data = GenerateRequest(**data)
@@ -82,6 +99,10 @@ def chat():
         data = request.get_json()
         if not data:
             raise OllamaValidationError("No JSON data provided")
+
+        # Validate model name format
+        if 'model' in data:
+            data['model'] = validate_model_name(data['model'])
 
         # Create chat request
         request_data = ChatRequest(**data)
@@ -107,10 +128,21 @@ def list_models():
         logger.error(f"List models endpoint error: {str(e)}")
         return handle_ollama_error(e)
 
+@app.route('/api/running', methods=['GET'])
+def list_running_models():
+    """List running models endpoint"""
+    try:
+        response = client.list_running_models()
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"List running models endpoint error: {str(e)}")
+        return handle_ollama_error(e)
+
 @app.route('/api/show/<model_name>', methods=['GET'])
 def show_model(model_name):
     """Show model information endpoint"""
     try:
+        model_name = validate_model_name(model_name)
         response = client.show_model(model_name)
         return jsonify(response)
     except Exception as e:
@@ -124,6 +156,12 @@ def create_model():
         data = request.get_json()
         if not data:
             raise OllamaValidationError("No JSON data provided")
+
+        # Validate model name format
+        if 'model' in data:
+            data['model'] = validate_model_name(data['model'])
+        if 'from_model' in data:
+            data['from_model'] = validate_model_name(data['from_model'])
 
         request_data = CreateModelRequest(**data)
         response = client.create_model(request_data)
@@ -142,6 +180,7 @@ def create_model():
 def delete_model(model_name):
     """Delete model endpoint"""
     try:
+        model_name = validate_model_name(model_name)
         response = client.delete_model(model_name)
         return jsonify(response.dict())
     except Exception as e:
@@ -161,6 +200,10 @@ def copy_model():
         if not source or not destination:
             raise OllamaValidationError("Source and destination model names are required")
 
+        # Validate model names format
+        source = validate_model_name(source)
+        destination = validate_model_name(destination)
+
         response = client.copy_model(source, destination)
         return jsonify(response.dict())
     except Exception as e:
@@ -178,6 +221,9 @@ def pull_model():
         model_name = data.get('name')
         if not model_name:
             raise OllamaValidationError("Model name is required")
+
+        # Validate model name format
+        model_name = validate_model_name(model_name)
 
         stream = data.get('stream', True)
         response = client.pull_model(model_name, stream=stream)
@@ -201,6 +247,9 @@ def push_model():
         if not model_name:
             raise OllamaValidationError("Model name is required")
 
+        # Validate model name format
+        model_name = validate_model_name(model_name)
+
         stream = data.get('stream', True)
         response = client.push_model(model_name, stream=stream)
 
@@ -219,6 +268,10 @@ def create_embedding():
         if not data:
             raise OllamaValidationError("No JSON data provided")
 
+        # Validate model name format
+        if 'model' in data:
+            data['model'] = validate_model_name(data['model'])
+
         request_data = EmbeddingRequest(**data)
         response = client.create_embedding(request_data)
         return jsonify(response.dict())
@@ -226,6 +279,26 @@ def create_embedding():
     except Exception as e:
         logger.error(f"Create embedding endpoint error: {str(e)}")
         return handle_ollama_error(e)
+
+@app.route('/api/version', methods=['GET'])
+def get_version():
+    """Version endpoint"""
+    try:
+        response = client.get_version()
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Version endpoint error: {str(e)}")
+        return handle_ollama_error(e)
+
+# Add static files handling
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
+
+@app.route('/')
+def index():
+    """Render the main UI"""
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
