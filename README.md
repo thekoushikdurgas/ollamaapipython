@@ -1,4 +1,3 @@
-
 # Ollama API Wrapper and UI
 
 A Flask-based web interface and Python wrapper for interacting with the Ollama API. This project provides both a user-friendly web UI and a programmatic way to interact with Ollama's language models.
@@ -19,11 +18,13 @@ A Flask-based web interface and Python wrapper for interacting with the Ollama A
 ## Getting Started
 
 1. Install the required packages:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 2. Run the Flask server:
+
 ```bash
 python app.py
 ```
@@ -41,6 +42,7 @@ python app.py
 ## Development Mode
 
 The project includes a mock server for development. Enable it by setting:
+
 ```python
 os.environ['USE_MOCK_OLLAMA'] = 'true'
 ```
