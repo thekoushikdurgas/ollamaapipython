@@ -1,4 +1,5 @@
 from .client import OllamaClient
+from .async_client import AsyncOllamaClient
 from .exceptions import OllamaError, OllamaRequestError, OllamaResponseError
 from .models import (
     GenerateRequest,
@@ -14,6 +15,7 @@ from .models import (
 __version__ = "1.0.0"
 __all__ = [
     "OllamaClient",
+    "AsyncOllamaClient",
     "OllamaError",
     "OllamaRequestError", 
     "OllamaResponseError",
