@@ -94,7 +94,8 @@ class ModelInfo(BaseModel):
     family: str
     families: Optional[List[str]] = None
     parameter_size: str
-    quantization_level: Optional[str] = None
+    quantization_level: str
+    parent_model: Optional[str] = ""
 
 class ModelDetails(BaseModel):
     name: str
