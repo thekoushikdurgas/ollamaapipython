@@ -19,7 +19,9 @@ import hashlib
 import asyncio
 from typing import Any, Dict, Generator, AsyncGenerator
 from functools import partial
+from ollama import AsyncClient
 
+ollama_client = AsyncClient()
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -301,16 +303,55 @@ def chat():
         return handle_ollama_error(e)
 
 @app.route('/api/models', methods=['GET'])
-def list_models():
+async def list_models():
     """List available models endpoint"""
     try:
-        response = client.list_models()
-        if isinstance(response, dict) and 'models' in response:
-            return jsonify(response['models'])
-        return jsonify([])
+        response = await ollama_client.list()
+        models_info = []
+        for model in response.models:
+            model_info = {
+                'name': model.model,
+                'size': f"{(model.size / 1024 / 1024):.2f} MB",
+            }
+            if model.details:
+                model_info.update({
+                    'format': model.details.format,
+                    'family': model.details.family,
+                    'parameter_size': model.details.parameter_size,
+                    'quantization_level': model.details.quantization_level
+                })
+            models_info.append(model_info)
+        return jsonify(models_info)
     except Exception as e:
-        logger.error(f"List models endpoint error: {str(e)}")
-        return handle_ollama_error(e)
+        return await handle_ollama_error(e)
+    #     if isinstance(response, dict) and 'models' in response:
+    #         return jsonify(response['models'])
+    #     return jsonify([])
+    # except Exception as e:
+    #     logger.error(f"List models endpoint error: {str(e)}")
+    #     return handle_ollama_error(e)
+    
+# @app.route('/models', methods=['GET'])
+# async def list_models():
+#     try:
+#         response = await ollama_client.list()
+#         models_info = []
+#         for model in response.models:
+#             model_info = {
+#                 'name': model.model,
+#                 'size': f"{(model.size / 1024 / 1024):.2f} MB",
+#             }
+#             if model.details:
+#                 model_info.update({
+#                     'format': model.details.format,
+#                     'family': model.details.family,
+#                     'parameter_size': model.details.parameter_size,
+#                     'quantization_level': model.details.quantization_level
+#                 })
+#             models_info.append(model_info)
+#         return jsonify(models_info)
+#     except Exception as e:
+#         return await handle_ollama_error(e)
 
 @app.route('/api/running', methods=['GET'])
 def list_running_models():

@@ -1,6 +1,8 @@
 """Mock server for Ollama API testing"""
 import time
 from typing import Dict, Any, Generator, Optional
+
+import requests
 # from flask import Flask, request, jsonify
 # from ollama_wrapper import logger
 from ollama_wrapper.config import Config
