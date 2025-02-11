@@ -300,7 +300,7 @@ def chat():
         logger.error(f"Chat endpoint error: {str(e)}")
         return handle_ollama_error(e)
 
-@app.route('/api/models', methods=['GET'])
+@app.route('/api/tags', methods=['GET'])
 def list_models():
     """List available models endpoint"""
     try:
