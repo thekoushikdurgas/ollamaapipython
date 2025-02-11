@@ -101,29 +101,33 @@ class MockOllamaServer:
         return {
             "models": [
                 {
-                    "name": "codellama:13b",
-                    "modified_at": "2024-02-11T10:00:00Z",
-                    "size": 7365960935,
-                    "digest": "9f438cb9cd581fc025612d27f7c1a6669ff83a8bb0ed86c94fcf4c5440555697",
+                    "name": "my-assistant:latest",
+                    "model": "my-assistant:latest",
+                    "modified_at": "2025-02-11T04:28:34+05:30",
+                    "size": 2019393299,
+                    "digest": "c60ad55315a522bb8967df8a787f336fb80f143d6700c2709c1dcf9d324110c8",
                     "details": {
                         "format": "gguf",
                         "family": "llama",
-                        "families": None,
-                        "parameter_size": "13B",
-                        "quantization_level": "Q4_0"
+                        "families": ["llama"],
+                        "parameter_size": "3.2B",
+                        "quantization_level": "Q4_K_M",
+                        "parent_model": ""
                     }
                 },
                 {
-                    "name": "llama3:latest",
-                    "modified_at": "2024-02-11T10:00:00Z",
-                    "size": 3825819519,
-                    "digest": "fe938a131f40e6f6d40083c9f0f430a515233eb2edaa6d72eb85c50d64f2300e",
+                    "name": "codellama:python",
+                    "model": "codellama:python",
+                    "modified_at": "2025-02-11T03:57:02+05:30", 
+                    "size": 3825819368,
+                    "digest": "120ca3419eae9e8d1695d95ee5825aed1902a29d93404f1fc5542c5297ac32f7",
                     "details": {
                         "format": "gguf",
                         "family": "llama",
-                        "families": None,
+                        "families": ["llama"],
                         "parameter_size": "7B",
-                        "quantization_level": "Q4_0"
+                        "quantization_level": "Q4_0",
+                        "parent_model": ""
                     }
                 }
             ]

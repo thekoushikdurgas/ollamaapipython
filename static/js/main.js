@@ -34,7 +34,11 @@ async function checkServerStatus() {
 async function populateModelDropdowns() {
   try {
     const response = await fetch("/api/models");
-    if (!response.ok) return;
+    if (!response.ok) {
+      console.error("Failed to fetch models:", response.statusText);
+      return;
+    }
+    
     const data = await response.json();
     const models = data.models || [];
 
@@ -47,11 +51,25 @@ async function populateModelDropdowns() {
         select.remove(1);
       }
 
+      // Sort models by name
+      models.sort((a, b) => a.name.localeCompare(b.name));
+
       // Add model options
       models.forEach((model) => {
         const option = document.createElement("option");
         option.value = model.name;
-        option.textContent = `${model.name} (${model.details.parameter_size}, ${model.details.quantization_level})`;
+        
+        // Calculate size in GB
+        const sizeGB = (model.size / 1024 / 1024 / 1024).toFixed(2);
+        
+        // Format option text with model details
+        option.textContent = `${model.name} (${model.details.parameter_size}, ${model.details.quantization_level}, ${sizeGB}GB)`;
+        
+        // Add data attributes for additional info
+        option.dataset.family = model.details.family;
+        option.dataset.format = model.details.format;
+        option.dataset.modified = new Date(model.modified_at).toLocaleString();
+        
         select.appendChild(option);
       });
     });
